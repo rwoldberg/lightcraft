@@ -34,6 +34,7 @@ lightcraft-ui-egui = { path = "crates/ui-egui" }
 lightcraft-mcp = { path = "crates/mcp" }
 lightcraft-fetch = { path = "crates/fetch" }
 lightcraft-heif = { path = "crates/heif" }
+lightcraft-video = { path = "crates/video" }
 lightcraft-segment = { path = "crates/segment" }
 
 # foundation
@@ -68,6 +69,14 @@ moxcms = { version = "0.9", default-features = false, features = ["lut"] }
 jxl-oxide = { version = "0.12", default-features = false }
 zune-jpegxl = { version = "0.5", default-features = false, features = ["std"] } # MIT/Apache-2.0/Zlib lossless JXL encoder (test fixtures only)
 ravif = { version = "0.13", default-features = false, features = ["threading"] } # no "asm": it needs nasm (non-Rust)
+
+# video (crates/video): FilmCraft's clean-room, pure-Rust (no unsafe) MP4/MOV demuxer and decoders,
+# MIT OR Apache-2.0, same team. Pinned to one commit: moving the pin is a reviewed change (re-run
+# `cargo test -p lightcraft-video --features hevc` and play real clips).
+filmcraft-isobmff = { git = "https://github.com/storytold/filmcraft", rev = "9efe8f3112194b58a30cf0449b569306077c67d4" }
+filmcraft-h264 = { git = "https://github.com/storytold/filmcraft", rev = "9efe8f3112194b58a30cf0449b569306077c67d4", default-features = false }
+filmcraft-hevc = { git = "https://github.com/storytold/filmcraft", rev = "9efe8f3112194b58a30cf0449b569306077c67d4", default-features = false }
+filmcraft-h264enc = { git = "https://github.com/storytold/filmcraft", rev = "9efe8f3112194b58a30cf0449b569306077c67d4" } # dev-only: test clips are generated, never committed
 
 # gpu (crates/gpu; native backends only, no GL: everything stays pure Rust)
 # SAM 3 inference (lightcraft-segment). 0.9.2: later releases pull `tokenizers` with the

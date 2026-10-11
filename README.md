@@ -261,7 +261,11 @@ lightcraft --control 7980 ~/Pictures/trip
 - **Pure Rust, no C.** Our own RAW decoders (DNG, Canon CR2/CR3, Sony ARW, Nikon NEF, Fujifilm RAF incl. X-Trans,
   Panasonic RW2 / Leica RWL, Pentax PEF, Olympus ORF), our own colour science, our own pipeline. JPEG, PNG, TIFF, WebP,
   PSD composites and JPEG XL open today; HEIC/HEIF photos too with `--features heif` (HEVC is a build-time choice,
-  as in PhotoCraft).
+  as in PhotoCraft). One exception to "no C": the sound of videos goes through the system's audio library (ALSA on
+  Linux and FreeBSD).
+- **Videos next to your photos.** `.mp4`, `.mov` and `.m4v` clips import into the library and play in the loupe with
+  sound: H.264 and Motion JPEG out of the box, HEVC (most iPhone video) with `--features video-hevc`. Decoding is in
+  software, so 4K clips play at reduced size; trimming, editing and exporting video are not there yet.
 - **Scene-referred & wide-gamut.** Linear Rec.2020 float internally, Bradford-adapted white balance, gamut mapping
   instead of clipping, a filmic shoulder for raw and pixel-exact pass-through for JPEGs you haven't touched.
 - **Resolution-independent edits.** Radii and brush sizes are relative to the image, so a 400 px preview, your
@@ -292,7 +296,7 @@ LightCraft is young and moving fast. **Where we honestly stand** (details in the
   - **camera colour calibration:** Sony, Nikon, Panasonic, Fujifilm and Canon CR3 raws have guarded estimates from their camera JPEGs, with built-in ILCE-7M4, X-H2S and X-T4 profiles; measured calibration is missing, and other raws or rejected fits retain a neutral matrix;
   - **compressed Olympus raws and unsupported CR3 variants:** these use embedded JPEG previews when present. Fujifilm lossless/lossy compressed RAF now decodes sensor data; [verification and existing-library reload instructions](docs/raf-compression.md);
   - **AI masks and denoise:** subject and sky selection are classical heuristics;
-  - **HDR, video and the Classic Print / Book / Map modules.**
+  - **HDR, video beyond playback (trim, edits, export, hardware decoding) and the Classic Print / Book / Map modules.**
 - **What's next:** see [where we're going](ROADMAP.md#where-were-going).
 
 | Area | Status |
@@ -316,7 +320,8 @@ LightCraft is young and moving fast. **Where we honestly stand** (details in the
 | Optics (distortion, vignetting, auto + manual CA, defringe, lens corrections embedded in DNG files and Panasonic / Leica RW2 / RWL distortion data), Geometry (transforms, Constrain Crop), Upright (Auto/Level/Vertical/Full/Guided) | ✅ · camera lens profiles (our own) ⬜ |
 | Photo Merge: HDR (auto-align, deghost), Panorama (spherical/cylindrical/perspective, boundary warp, auto crop), HDR Panorama → DNG | ✅ |
 | GPU pipeline (wgpu compute, CPU-exact within 1/255), CPU fallback on device limits / errors | ✅ · WebGPU in the browser 🚧 |
-| AI: segmentation masks, AI denoise, super resolution, faces; HDR editing; video | ⬜ (see [roadmap](ROADMAP.md#where-were-going)) |
+| Video: import, poster, playback with sound in the loupe (H.264, Motion JPEG; HEVC with `--features video-hevc`) | ✅ · hardware decoding, trim, edits, export ⬜ |
+| AI: segmentation masks, AI denoise, super resolution, faces; HDR editing | ⬜ (see [roadmap](ROADMAP.md#where-were-going)) |
 | Web build (same UI in the browser via WASM): persistent library in OPFS/IndexedDB, Web Worker rendering, export downloads | ✅ · WebGPU, Safari/Firefox testing 🚧 |
 
 <sub>✅ works today · 🚧 in progress · ⬜ not started</sub>

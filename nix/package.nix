@@ -4,8 +4,11 @@
 #   nix build          # → ./result/bin/lightcraft, ./result/bin/lightcraft-cli
 #
 # Kept in step with the release workflow (.github/workflows/release.yml) and packaging/env.sh:
-#   * `Cargo.lock` drives the dependencies (`cargoLock`), so there is no vendorHash to bump — only
-#     crates.io, no git sources;
+#   * `Cargo.lock` drives the dependencies (`cargoLock`), so there is no vendorHash to bump.
+#     NEEDS UPDATE (2026-10-11): the workspace now has git sources, the storytold/filmcraft crates
+#     behind `crates/video` (pinned by rev in the root Cargo.toml). `cargoLock` needs their hash in
+#     `cargoLock.outputHashes` (one entry per git crate name-version, all the same hash) before
+#     `nix build` works again; it is not guessed here. Bump it whenever that pin moves;
 #   * `CRAFT_FONTS_DIR` embeds the CJK fonts from storytold/craft-fonts (the `craft-fonts`
 #     flake input); without it everything builds and runs, but Japanese and Chinese text have no glyphs;
 #   * the desktop file, hicolor icons and AppStream metadata are the same files the .deb/.rpm ship
@@ -13,14 +16,17 @@
 #   * `doCheck` runs `cargo test --workspace`, what `cargo xtask ci` runs. `nix build` runs it too;
 #     `pkgs.lightcraft.overrideAttrs { doCheck = false; }` skips it for a faster, build-only install.
 #
-# Everything in the product is pure Rust (no C/C++ dependencies), so this needs no build system
-# beyond cargo plus the windowing headers winit's build scripts look for.
+# Everything in the product is pure Rust with one exception: `cpal` (the sound of videos) links
+# ALSA on Linux (`alsa-lib` below, untested here). So this needs no build system beyond cargo plus
+# that and the windowing headers winit's build scripts look for.
 {
   lib,
   stdenv,
   rustPlatform,
   pkg-config,
   makeWrapper,
+  # The sound of videos: cpal links ALSA on Linux.
+  alsa-lib,
   # Windowing/GPU libraries: needed at build time by the crates that link them, at run time by the
   # ones that open them with dlopen() (see `runtimeLibs`), and by the dev shell (flake.nix).
   wayland,
@@ -132,6 +138,7 @@ rustPlatform.buildRustPackage {
   ++ lib.optionals (isLinux && autoAddDriverRunpath != null) [ autoAddDriverRunpath ];
 
   buildInputs = lib.optionals isLinux [
+    alsa-lib
     wayland
     libxkbcommon
     libx11

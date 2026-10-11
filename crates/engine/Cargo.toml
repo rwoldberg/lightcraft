@@ -24,9 +24,11 @@ lightcraft-raw = { workspace = true }
 lightcraft-denoise-core = { workspace = true }
 lightcraft-denoise = { workspace = true, optional = true }
 lightcraft-meta = { workspace = true }
+lightcraft-lensdb = { workspace = true }
 lightcraft-faces = { workspace = true }
 miniz_oxide = { workspace = true }
 lightcraft-merge = { workspace = true }
+lightcraft-geocode = { workspace = true }
 lightcraft-video = { workspace = true }
 rayon = { workspace = true }
 serde = { workspace = true }
@@ -54,5 +56,9 @@ video-hevc = ["lightcraft-video/hevc"]
 [dev-dependencies]
 # generated test clips (an H.264 encoder: tests only)
 lightcraft-video = { workspace = true, features = ["testkit"] }
+# HDR JPEG XL tests read the file's colour encoding
+jxl-oxide = { workspace = true }
+# Lossless synthetic HEIC files (the import test; decoded when the codecs' `heif` feature is on).
+lightcraft-heif = { workspace = true, features = ["testdata"] }
 libc = { workspace = true }
 lightcraft-tiff = { workspace = true }

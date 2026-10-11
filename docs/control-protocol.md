@@ -22,6 +22,34 @@ that hit an error reply should reconnect. The port has no authentication, so onl
 mode ([mcp.md](mcp.md)) is a thin layer over this channel. Implementation:
 `crates/ui-egui/src/control.rs` (methods) and `apps/lightcraft/src/control_server.rs` (transport).
 
+## Isolated automation profiles
+
+Set `LIGHTCRAFT_CONFIG_DIR` to a fresh directory to isolate UI preferences, app logs, the emergency
+panic log, the GPU initialization marker, camera profiles and default model folders. The nonempty
+value is used as the complete settings directory. Unset retains the normal platform paths; an explicit
+empty value disables the settings directory, while the emergency panic log retains its system-temp path.
+Explicit model-directory environment variables still take precedence over their defaults.
+Also pass `--library DIR` with a separate scratch library: the configuration override does not change
+the default photo-library location. Do not use `--memory` or `LIGHTCRAFT_NO_PREFS` when testing persistence.
+
+A native acceptance run must reject the stderr message `rendering headlessly`: `ui.screenshot`
+automatically uses the CPU fallback after two seconds without a presented frame. That fallback is useful
+for headless scripts, but cannot establish native-window acceptance. Control input injects egui events;
+it does not establish operating-system input delivery or screen-reader acceptance.
+
+On macOS, the native menu owns its keyboard accelerators. `ui.key` injects egui key events and
+does not synthesize the Cocoa menu events for those shortcuts. Use `ui.menu.invoke` with the
+command ID (for example `edit.undo`, `edit.redo`, `view.filmstrip` or `view.leftPanel`) to test
+their command behavior. That API invokes the app command dispatcher directly; it does not traverse
+Cocoa menu dispatch. Native menu activation and keyboard accelerator delivery require a separate test.
+
+Before capturing a finished Detail view, poll `ui.inspect` until the expected `loupe.photo` is active,
+`loupe.source` is `render` or `cached`, `loupe.pending` is false, and the render queues are empty.
+For the loupe, `cached` is a prior view render keyed by the current photo and develop settings;
+`thumb`, `small` and `embedded` are separate fallback sources. A presented frame can otherwise
+contain an in-progress rendering placeholder. Require loaded thumbnail textures only when the
+filmstrip is visible.
+
 ## Methods
 
 | Method | Params | Result |
@@ -30,23 +58,35 @@ mode ([mcp.md](mcp.md)) is a thin layer over this channel. Implementation:
 | `engine.commands` | — | Engine + UI commands: id, label, menu, shortcut, params doc, enabled |
 | `ui.menu.list` | — | Menu entries (flat: id, label, menu path, shortcut, enabled) |
 | `ui.menu.tree` | — | The menu bar as shown (File … Help): items `{id, params?, label, shortcut?, enabled, checked?}`, separators, submenus — the model behind the native macOS menu bar and the in-window menus |
-| `ui.inspect` | — | UI state, window, `loupe` (`source`, and `region: {full, window, pending}` when a zoomed view also renders the window on screen at no more than 100 % — `full` is the frame it is cut from, `window` its `[x, y, w, h]` — and `regionBefore` for the Before side of a Before/After view), canvas/image rects, `scroll: {grid, filmstrip}` (scroll offsets in points, `null` until drawn), active photo, selection, perf (`frameMs` = layout, `logicMs` = per-frame logic before it, `updateMs` = both, `maxUpdateMs`, `fps`, render queue …, `gpu` = adapter in use, `gpuReason` = why renders don't use the GPU, `gpuFallback` = latest render redone on the CPU and why — see `docs/gpu-pipeline.md`), status, memory (bytes per cache, see `library.memory`; plus stage caches — `budgetBytes`, `trimmed`, `sharedSourceBytes` (the one device copy of a big original) — and textures), `export: {running: {total, done, current} \| null, last}`, `notices` (warnings waiting to be shown, e.g. a damaged settings file; OK = `button:noticeOk`), `quitPrompt` (why quitting was stopped: unsaved changes; `button:quitRetry` / `button:quitAnyway` / `button:quitCancel`), `import: {done, total, imported, cancelled} \| null` (an import runs on a worker thread), `tasks` (other background work: `Find Missing Photos`, `Auto Import`), `fileDialogs` (commands waiting on a native file dialog, which runs off the UI thread; they run again with the answer when it closes) |
+| `ui.inspect` | — | UI state, window, `loupe` (`source`, and `region: {full, window, pending}` when a zoomed view also renders the window on screen at no more than 100 % — `full` is the frame it is cut from, `window` its `[x, y, w, h]` — and `regionBefore` for the Before side of a Before/After view), canvas/image rects, `scroll: {grid, filmstrip}` (scroll offsets in points, `null` until drawn), active photo, selection, perf (`frameMs` = layout, `logicMs` = per-frame logic before it, `updateMs` = both, `maxUpdateMs`, `fps`, render queue …, `gpu` = adapter in use, `gpuReason` = why renders don't use the GPU, `gpuFallback` = latest render redone on the CPU and why — see `docs/gpu-pipeline.md`), status, memory (bytes per cache, see `library.memory`; plus stage caches — `budgetBytes`, `trimmed`, `sharedSourceBytes` (the one device copy of a big original) — and textures), `export: {running: {total, done, current} \| null, last}`, `notices` (warnings waiting to be shown, e.g. a damaged settings file; OK = `button:noticeOk`), `quitPrompt` (why quitting was stopped: tasks that would be cut short are running — `button:quitAnyway` cancels them and quits, `button:quitCancel` keeps working — or unsaved changes: `button:quitRetry` / `button:quitAnyway` / `button:quitCancel`), `import: {done, total, imported, cancelled} \| null` (an import runs on a worker thread), `tasks` (other background work: `Find Missing Photos`, `Auto Import`), `activity` (every long-running task in flight as the activity stack in the top-left corner shows it, same shape as `activity.list`; a row appears once its task is 0.5 s old, ids `activity:row:<id>`, ✕ = `activity:cancel:<id>`, `activity:more` expands past 3 rows), `fileDialogs` (commands waiting on a native file dialog, which runs off the UI thread; they run again with the answer when it closes), `copied` (the text the UI last put on the clipboard, `null` until something is copied) |
 | `ui.widgets` | `{filter?}` | On-screen widgets `{id, rect: [x, y, w, h]}` (screen points) |
-| `ui.clickWidget` / `ui.dragWidget` / `ui.hoverWidget` | `{id, count?, fx?, fy?}` / `{id, toX?, toY?, dx?, dy?, steps?}` / `{id, fx?, fy?}` | Real egui input on a widget (hover: the pointer rests on it, e.g. for preset/profile previews) |
+| `ui.clickWidget` / `ui.dragWidget` / `ui.hoverWidget` | `{id, count?, button?, fx?, fy?}` (`button: "right"` right-clicks) / `{id, toX?, toY?, dx?, dy?, steps?}` / `{id, fx?, fy?}` | Real egui input on a widget (hover: the pointer rests on it, e.g. for preset/profile previews) |
 | `ui.move` / `ui.click` / `ui.drag` | `{x, y, count?, button?}` / `{x, y, toX, toY, steps?}` | Raw pointer input, screen points |
 | `ui.pointer` | `{events: [{kind: down\|drag\|up, x, y}], alt?, shift?, cmd?}` | Gesture in normalized image coordinates (Detail view) |
 | `ui.key` | `{key, cmd?, shift?, alt?, ctrl?}` | Key press |
 | `ui.text` | `{text}` | Text input |
+| `ui.clipboard` | `{action: cut\|copy\|paste, text?}` | Cut, copy or paste in the focused text field, as the system does for ⌘X / ⌘C / ⌘V; `paste` pastes `text`, or the system clipboard without it. Refused when no text field has the focus (outside one, ⌘C / ⌘V are the commands `develop.copy` / `develop.paste`). In the desktop app cut and copy write the system clipboard. `ui.inspect` → `copied` is the text the UI last put on the clipboard |
 | `ui.scroll` | `{dx, dy, cmd?, ctrl?, shift?, alt?}` | Wheel / two-finger scroll at the current pointer; pans over the image, modifier-scroll zooms |
 | `ui.zoom` | `{factor}` | Pinch zoom at the current pointer (positive scale multiplier; 1 = unchanged). Position it first with `ui.move` or `ui.hoverWidget` |
 | `ui.set` | partial UI state, e.g. `{"view": "detail"}` | Resulting UI state |
 | `ui.dialog.confirm` / `ui.dialog.cancel` | — | Close the open dialog |
 | `ui.resize` | `{width, height}` | Resize the window |
+| `ui.zoomFactor` | `{factor}` | Set the interface scale (0.5–3; egui's zoom keys are off, Cmd+= / Cmd+- zoom the photo) |
 | `ui.screenshot` | `{path?, headless?}` | `{path, width, height}` once the frame (with finished renders) is captured. `headless: true` draws the UI on the CPU (no compositor needed); a windowed capture that gets no frame within 2 s falls back to headless automatically |
-| `engine.execute {command: "app.export", params}` | export params (see `docs/mcp.md`), plus `preset`, `dir` / `path`, `ids`, `background` | Writes the files and returns `{files}`; with `background: true` (what the Export dialog and menus use) it returns `{background: true, total}` at once and the batch runs on a worker thread — poll `ui.inspect` → `export` |
+| `engine.execute {command: "app.export", params}` | export params (see `docs/mcp.md`), plus `preset`, `dir` / `path`, `ids`, `background` | Writes the files and returns `{files}` (one `{path, width, height, bytes, sidecars}` per file, plus `gpuFallback` — why that render fell back from the GPU to the CPU — when it did; see `docs/gpu-pipeline.md`); with `background: true` (what the Export dialog and menus use) it returns `{background: true, total}` at once and the batch runs on a worker thread — poll `ui.inspect` → `export` |
 | `engine.execute {command: "video.playPause"}` (also `video.play`, `video.pause`, `video.seek`, `video.step`, `video.stop`, `video.status`, `video.mute`, `video.volume`) | `video.seek`: `seconds` or `fraction` (0..1 of the length); `video.step`: `frames` (default 1, negative steps back); `video.mute`: `on` (without it: toggles); `video.volume`: `level` (0..1; above 0 also unmutes) | Plays the video shown in Detail (the active photo must be a video; otherwise an error). Each returns the player's status `{photo, playing, position, duration, frameRate, ended, error, framesShown, framesDropped, waits, reduced, audio}`, or `null` when nothing has been played yet (`video.mute` and `video.volume` need no video and return `{muted, volume}`, which are app settings `videoMuted` / `videoVolume`); the same object is `ui.inspect` → `video`. Decoding runs on a worker thread: poll `position` / `ended` / `error`. Space does `video.playPause` there. Widgets: `video:play`, `video:seek`, `video:time`, `video:picture`, `video:mute`, `video:volume`, and `video:error` when the file can't be played. **Sound:** `audio` is `{codec, sampleRate, channels, playing, muted, volume, underruns, position, clock, silent, note}`. `clock` says what playback follows: `audio` (the samples the output device has taken; `position` is that time in seconds and the picture follows it), `waiting` (the sound is being readied) or `wall` (no sound drives playback: `silent` says why, e.g. `the video has no sound`, `no audio output device`, `the audio device stopped`). `note` is a hardware message (a fallback device is in use). When the picture can't be decoded as fast as the sound plays, the sound waits for it (`waits` counts those) and on every second wait the player halves the size it decodes at, up to twice (`reduced`). For playback frames are decoded at 1920 pixels on the long edge at most. Headless sessions (`lightcraft-cli snapshot`, MCP) have no output device: videos play there on the wall clock |
+| `engine.execute {command: "activity.list"}` | — | The long-running tasks in flight (imports, exports, preview builds, downloads, the face scan…), oldest first: `{tasks: [{id, kind, label, done, total, unit, detail, cancellable, cancelling, ageMs}]}`; `total` 0 = not known yet; `unit` is `count`, `bytes` or `percent`; `label` is English (the app shows it translated) |
+| `engine.execute {command: "activity.cancel"}` | `{id}` or `{all: true}` | Asks the task (or every cancellable one) to stop at its next file or photo → `{cancelled: n}`; an unknown id (it may have just finished) or a task that can't be cancelled is an error |
 | `ui.render` | `{id?, size?, path?}` | Render a photo (PNG to `path`), `{width, height}` |
 | `app.quit` | — | Close the app |
+
+White balance (`develop.set` with `wb.temp` / `wb.tint`, `develop.wb`, `develop.wbPick`) is in Kelvin and tint on
+raws with colour matrices — in the file (DNG) or measured for the camera model (`lightcraft_raw::spectral`; issue
+#730) — where As Shot reads the file's as-shot white; rendered files and raws without matrices use a relative scale
+whose 6500 K / 0 is the as-shot look (the Edit panel shows it as −100..+100). The stored `wb` of such a Kelvin raw
+says `"scale": "kelvin"`; a partial settings JSON given to `develop.merge` or a preset whose `wb` sets `temp` / `tint`
+**without** `scale` keeps the relative meaning it always had (6500 = as shot) on every raw, so agents that mean
+Kelvin on a Kelvin raw pass `"scale": "kelvin"` or use `develop.set` / `develop.wb`.
 
 Image navigation is also available directly as the UI command `view.navigate`, with
 `{zoom?: "fit" | "fill" | {"percent": number}, pan?: [x, y]}`. Percentage zoom accepts fractional
@@ -55,6 +95,18 @@ Pinching keeps the image point under the pointer steady and zooms between Fit an
 scrolling pans in both axes and respects the operating system's scrolling direction and momentum.
 These gestures work in Detail (including editing tools and full-screen preview), Compare and Reference
 views, and only apply over their image areas. Panning stops at the image edges.
+
+The interface theme is `view.appearance {mode?: "auto" | "light" | "dark"}` (no mode: the next one,
+Auto → Light → Dark → Auto, like the top bar's `icon:appearance` button) and `view.theme {theme:
+"charcoal" | "midnight" | "silver" | "paper"}`, which picks a theme and fixes the mode to its family.
+Both reply `{mode, darkTheme, lightTheme}`; the same values are `settings.appearanceMode`,
+`settings.darkTheme` and `settings.lightTheme` in `ui.set`. Auto follows the system (on Linux the
+XDG desktop portal, watched for changes rather than polled) and is dark when the system says nothing.
+Mask brushing uses the UI command `tool.brush` through `engine.execute`. With `{}` it activates
+painting on the current mask. `{"new": true}` creates a separate brush mask; `{"op": "add"}` or
+`{"op": "subtract"}` appends a brush component to the selected mask. Creating either starts in
+paint mode with the overlay visible. Brush Erase (or Alt while painting) removes strokes' coverage
+within that brush component; it is distinct from subtracting the component from the whole mask.
 
 ### When the library can't be saved
 
@@ -76,6 +128,18 @@ to do: `ui.inspect` → `libraryProblem` is `{path, error, temporarySession, pen
 are `button:libraryRetry`, `button:libraryChoose`, `button:libraryTemporary` (Continue Without Saving) and
 `button:libraryQuit`. A temporary session shows a banner (`indicator:temporarySession`, `button:libraryReopen`) and
 writes nothing. `app.openLibrary` opening a library ends it.
+
+### Open Library on a Lightroom catalog
+
+`app.openLibrary` never makes a LightCraft library inside a Lightroom Classic catalog (issue #891): given the catalog
+folder (it holds a `*.lrcat`), one of its `*.lrdata` / `*.lrcat-data` folders or `Backups/`, the `.lrcat` itself or
+its `-wal` / `-shm` / `.lock` files, it keeps the library open now and returns `{opened: false, lightroomCatalog:
+<the .lrcat found, or null>, path}`; the window shows a dialog whose `button:dialogOk` (Import Lightroom Catalog…, or
+`ui.dialog.confirm`) runs `file.importLightroom` with that catalog (no catalog found: it asks for one) and
+`button:dialogCancel` (`ui.dialog.cancel`) does nothing. A folder that is a LightCraft library (`catalog.snap` / `catalog.log`) always
+opens as one. With no library open (the library problem window) it is an error instead. The engine refuses the same
+places (`EngineError::LightroomCatalog`, so `lightcraft-cli --library` and `mcp --library` too). `library.importLightroom
+{status: true}` reports the catalog's `path` after the task ends as well as while it runs.
 
 ## Headless rendering (no window, no GPU)
 
@@ -101,7 +165,8 @@ Headless screenshot dimensions must be finite and at least one logical point, wi
 positive scale. Rounded output must be at least one pixel per edge, at most 16,384 pixels
 per edge and 64 million pixels in total. `snapshot` and `ui.resize` reject requests outside
 these limits before layout or rasterization; supplied resize dimensions must be numbers.
-UI zoom changes text and control sizes while preserving the snapshot viewport's requested
+An interface zoom (egui's zoom factor; the keyboard never changes it — ⌘= / ⌘− / ⌘0 zoom the
+photo, issue #566) changes text and control sizes while preserving the snapshot viewport's requested
 physical pixel dimensions. Later `ui.resize` requests use current egui points; validation
 and rasterization both convert them to native viewport points before rounding the output
 pixels. A native edge below one point after zooming out is valid if it rounds to at least
@@ -117,3 +182,22 @@ one pixel.
   renders are in flight. Each request runs frames until it is answered and its injected input
   (clicks, keys, drags) has played out. Widget ids for `ui.clickWidget` come from `ui.widgets`
   (e.g. `button:upright-auto`). A 1600×1000 demo snapshot takes ~1–2 s (debug build).
+
+## Panel docking
+
+Library, Tools, and Presets panels can be regrouped, split, floated within the app window, closed, and reopened. Tools keeps the current Edit/Crop/Masking mode; the photo view and filmstrip stay together. The document/session view is protected. Layouts, active tabs, panel visibility, and floating rectangles are saved with the app's existing UI preferences. These operations do not edit document contents.
+
+Panel IDs: `library`, `tools`, `presets`. The protected center is `canvas`.
+
+`ui.dock` accepts `operation` and `panel`. Operations are `open`, `close`, `activate`, `float` (with finite positive `rect: [x, y, width, height]`), or `move` (with `target` and `zone: center|left|right|top|bottom`). Center groups with the target; side zones split beside it. `ui.dock.reset` restores the default arrangement. Invalid moves return an error without changing the layout.
+
+Invoke these UI commands through `engine.execute`, for example `{"command":"ui.dock","params":{"operation":"float","panel":"tools","rect":[100,100,320,440]}}`.
+
+Advanced `ui.dock` operations use the same validated transaction as pointer gestures:
+`moveFloating` updates `rect`, `resizeSplit` accepts a boolean child `path` and
+`size` (`{"Ratio":0.5}`, `{"FixedFirst":280}`, or `{"FixedSecond":280}`),
+`setStackOpen` takes `open`, and `resizeStack` takes a point `height` or null.
+A center `move` can include `before` (panel ID or null to append) for tab order.
+The equivalent `{"action": ...}` form accepts a serialized shared docking action;
+this is also the form emitted by the renderer. Protected-canvas and app-specific panel
+rules apply equally to both forms.

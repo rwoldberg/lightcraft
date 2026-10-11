@@ -120,32 +120,66 @@ pub fn specs() -> Vec<CommandSpec> {
 }
 
 /// Edit in an external editor, the engine half: render the photo with its edits as a 16-bit
-/// TIFF next to the original (`<name>-Edit.tif`, never overwriting), add it to the library and
-/// stack it on top of the original. The host opens the file in the editor.
+/// TIFF (or PSD, or 8-bit) next to the original (`<name>-Edit.tif`, never overwriting), add it to
+/// the library and stack it on top of the original. The host opens the file in the editor.
 fn edit_external(s: &mut Session, p: &Value) -> Result<Value> {
     const C: &str = "photo.editExternal";
-    let id = s.active().ok_or_else(|| bad(C, "no active photo"))?;
-    let ph = s.catalog.photo(id).cloned().ok_or_else(|| bad(C, "no photo"))?;
-    let dir = match &ph.source {
-        Source::File { path } => Path::new(path).parent().map(|d| d.to_string_lossy().to_string()).unwrap_or_default(),
-        Source::Demo { .. } => match super::str_param(p, "dir") {
-            Some(d) => d.to_string(),
-            None => return Err(bad(C, "a generated demo photo has no folder: give `dir`")),
-        },
-    };
+    let mut ids = s.targets(p);
+    ids.dedup();
+    if ids.is_empty() {
+        return Err(bad(C, "no active photo"));
+    }
+    if ids.len() > MAX_EDIT_COPIES {
+        return Err(bad(C, format!("{} photos selected: edit at most {MAX_EDIT_COPIES} at a time", ids.len())));
+    }
     let space = match super::str_param(p, "colorSpace").unwrap_or("adobeRgb") {
         "srgb" => lightcraft_pipeline::OutputSpace::Srgb,
         "displayP3" => lightcraft_pipeline::OutputSpace::DisplayP3,
         "prophoto" | "proPhoto" => lightcraft_pipeline::OutputSpace::ProPhoto,
         _ => lightcraft_pipeline::OutputSpace::AdobeRgb,
     };
+    let format = match super::str_param(p, "format").unwrap_or("tiff") {
+        "tiff" | "tif" => crate::export::ExportFormat::Tiff,
+        "psd" => crate::export::ExportFormat::Psd,
+        f => return Err(bad(C, format!("format {f:?}: use tiff or psd"))),
+    };
+    let bit_depth = match p.get("bitDepth").and_then(Value::as_u64).unwrap_or(16) {
+        8 => 8,
+        16 => 16,
+        d => return Err(bad(C, format!("bitDepth {d}: use 8 or 16"))),
+    };
     let opts = crate::export::ExportOptions {
-        format: crate::export::ExportFormat::Tiff,
-        bit_depth: Some(16),
+        format,
+        bit_depth: Some(bit_depth),
         color_space: space,
         naming: "{name}-Edit".into(),
         conflict: crate::export::Conflict::Unique,
         ..Default::default()
+    };
+    let mut copies = Vec::new();
+    for id in ids {
+        copies.push(edit_copy(s, p, id, &opts)?);
+    }
+    let new: Vec<lightcraft_catalog::PhotoId> = copies.iter().filter_map(|c| c["id"].as_u64()).map(lightcraft_catalog::PhotoId).collect();
+    s.selection = crate::Selection { active: new.first().copied(), ids: new };
+    let first = copies.first().cloned().unwrap_or(Value::Null);
+    Ok(json!({"path": first["path"], "id": first["id"], "original": first["original"], "copies": copies}))
+}
+
+/// Most photos one Edit In renders (each becomes a full-size file on disk and a library photo).
+const MAX_EDIT_COPIES: usize = 50;
+
+/// One photo's edit copy for [`edit_external`]: rendered with `opts` next to its original (a demo
+/// photo into `dir`), added to the library and stacked on top of the original, expanded.
+fn edit_copy(s: &mut Session, p: &Value, id: lightcraft_catalog::PhotoId, opts: &crate::export::ExportOptions) -> Result<Value> {
+    const C: &str = "photo.editExternal";
+    let ph = s.catalog.photo(id).cloned().ok_or_else(|| bad(C, format!("no photo {}", id.0)))?;
+    let dir = match &ph.source {
+        Source::File { path } => Path::new(path).parent().map(|d| d.to_string_lossy().to_string()).unwrap_or_default(),
+        Source::Demo { .. } => match super::str_param(p, "dir") {
+            Some(d) => d.to_string(),
+            None => return Err(bad(C, "a generated demo photo has no folder: give `dir`")),
+        },
     };
     let mut written = Vec::new();
     let mut write = |path: &str, bytes: &[u8]| -> std::result::Result<(), String> {
@@ -155,13 +189,13 @@ fn edit_external(s: &mut Session, p: &Value) -> Result<Value> {
         Ok(())
     };
     let to = crate::export::Destination { dir, exact: None };
-    crate::export::export_batch(s, &[id], &opts, &to, &mut write, &|path| Path::new(path).exists()).map_err(|e| bad(C, e))?;
-    let out = written.into_iter().find(|w| w.ends_with(".tif")).ok_or_else(|| bad(C, "nothing was written"))?;
+    crate::export::export_batch(s, &[id], opts, &to, &mut write, &|path| Path::new(path).exists()).map_err(|e| bad(C, e))?;
+    let ext = format!(".{}", opts.format.extension());
+    let out = written.into_iter().find(|w| w.ends_with(&ext)).ok_or_else(|| bad(C, "nothing was written"))?;
     let r = s.execute("library.import", &json!({"paths": [out]}))?;
     let new = r["imported"].get(0).and_then(Value::as_u64).ok_or_else(|| bad(C, "the edit copy could not be added"))?;
     // stack: the edit on top of the original, expanded so both show
     let _ = s.execute("stack.group", &json!({"ids": [new, id.0], "top": new, "collapsed": false}));
-    s.selection = crate::Selection::single(lightcraft_catalog::PhotoId(new));
     Ok(json!({"path": out, "id": new, "original": id.0}))
 }
 
@@ -216,6 +250,33 @@ fn fill_missing_meta(id: lightcraft_catalog::PhotoId, ph: &lightcraft_catalog::P
     ops
 }
 
+/// Ops that give a photo the lens data its file carries now (`info`, a fresh probe), or none when
+/// it already has them. A catalog from before the lens data was read at import has none, so such a
+/// photo's correction stayed off. When the photo gains lens data and its develop settings are still
+/// what import gave it, the lens correction is turned on as import would; an edited photo keeps
+/// its settings.
+pub(crate) fn lens_ops(id: lightcraft_catalog::PhotoId, ph: &lightcraft_catalog::Photo, info: &crate::media::ProbeInfo) -> Vec<Op> {
+    if info.embedded_lens == ph.embedded_lens {
+        return Vec::new();
+    }
+    let mut ops = vec![Op::SetEmbeddedLens { id, lens: info.embedded_lens.map(Box::new) }];
+    // (a photo with a default-preset look keeps it: that look is its import state)
+    if ph.embedded_lens.is_none() && info.embedded_lens.is_some() && ph.import_look.is_none() && !ph.is_edited() && !ph.develop.optics.lens_profile {
+        let mut d = (*ph.develop).clone();
+        d.optics.lens_profile = true;
+        ops.push(Op::SetDevelop { id, settings: std::sync::Arc::new(d), label: "Lens Corrections".into(), edited: ph.edited.clone() });
+    }
+    ops
+}
+
+/// The op that gives a raw the as-shot white balance its file reads now (`info`, a fresh probe), or none when the
+/// catalog already has it or the photo is not a raw edited in Kelvin. A raw imported before its camera's matrices
+/// gave it a Kelvin scale keeps the relative scale's 6500 / 0 until a decode or Reload reads the file (issue #730).
+pub(crate) fn as_shot_wb_op(id: lightcraft_catalog::PhotoId, ph: &lightcraft_catalog::Photo, info: &crate::media::ProbeInfo) -> Option<Op> {
+    let read = info.as_shot_wb.filter(|(t, tint)| t.is_finite() && tint.is_finite())?;
+    (ph.develops_raw() && !ph.relative_wb() && ph.as_shot_wb != Some(read)).then_some(Op::SetAsShotWb { id, wb: Some(read) })
+}
+
 /// Re-read photos whose files changed on disk (an external editor saved them): new size,
 /// dimensions and content hash, cached sources dropped. → {reloaded: [ids]}
 fn reload(s: &mut Session, p: &Value) -> Result<Value> {
@@ -235,21 +296,21 @@ fn reload(s: &mut Session, p: &Value) -> Result<Value> {
         // camera fields the catalog lacks (e.g. a raw imported before its format was read) are filled in;
         // nothing already set is overwritten
         let meta_ops = fill_missing_meta(id, ph, &info);
-        let Some(op) = content_op(id, ph, info.clone()) else {
-            if !meta_ops.is_empty() {
-                ops.extend(meta_ops);
-                reloaded.push(id);
-            }
-            continue;
-        };
-        ops.push(op);
-        ops.extend(meta_ops);
+        let mut mine: Vec<Op> =
+            content_op(id, ph, info.clone()).into_iter().chain(meta_ops).chain(lens_ops(id, ph, &info)).chain(as_shot_wb_op(id, ph, &info)).collect();
+        if !mine.is_empty() {
+            ops.append(&mut mine);
+            reloaded.push(id);
+        }
         // virtual copies share the file
         for c in s.catalog.photos().filter(|c| c.copy_of == Some(id)) {
-            ops.extend(content_op(c.id, c, info.clone()));
-            reloaded.push(c.id);
+            let theirs: Vec<Op> =
+                content_op(c.id, c, info.clone()).into_iter().chain(lens_ops(c.id, c, &info)).chain(as_shot_wb_op(c.id, c, &info)).collect();
+            if !theirs.is_empty() {
+                ops.extend(theirs);
+                reloaded.push(c.id);
+            }
         }
-        reloaded.push(id);
     }
     for id in &reloaded {
         s.media.forget(*id);
@@ -322,7 +383,7 @@ pub fn edit_specs() -> Vec<CommandSpec> {
             "Reload from Disk",
             ["Photo"],
             None,
-            "{ids?} — re-read photos whose files changed on disk (e.g. saved by an external editor), or raws shown from their embedded preview that can be decoded now; camera fields the catalog lacks are filled in → {reloaded}",
+            "{ids?} — re-read photos whose files changed on disk (e.g. saved by an external editor), or raws shown from their embedded preview that can be decoded now; camera fields the catalog lacks are filled in, and so is the lens data the file carries (an untouched photo then gets its lens correction turned on as import would; an edited one keeps its settings) → {reloaded}",
             has_selection,
             reload
         ),
@@ -331,7 +392,7 @@ pub fn edit_specs() -> Vec<CommandSpec> {
             "Edit Copy for External Editor",
             [],
             None,
-            "{colorSpace?: adobeRgb (default) | proPhoto | displayP3 | srgb, dir?} — render the active photo with its edits as a 16-bit TIFF `<name>-Edit.tif` next to it, add it stacked on the original and select it → {path, id, original} (the app then opens it in the external editor)",
+            "{ids?, colorSpace?: adobeRgb (default) | proPhoto | displayP3 | srgb, format?: tiff (default) | psd, bitDepth?: 16 (default) | 8, dir?} — render each selected photo (or `ids`, at most 50) with its edits as `<name>-Edit.tif` (or `.psd`, flat, which PhotoCraft saves back to in place) next to it, add each stacked on its original and select the copies → {path, id, original (the first copy), copies: [{path, id, original}]} (the app then opens them in the external editor)",
             has_active,
             edit_external
         ),
@@ -364,5 +425,104 @@ mod tests {
         ph.meta = (**meta).clone();
         ph.captured = Some("2026-10-04T08:16:11".into());
         assert!(fill_missing_meta(PhotoId(1), &ph, &info).is_empty());
+    }
+
+    fn lens() -> lightcraft_develop::EmbeddedLens {
+        lightcraft_develop::EmbeddedLens {
+            warp: Some(lightcraft_develop::EmbeddedWarp { planes: [[1.0, -0.1, 0.03, 0.0, 0.0, 0.0]; 3], ..Default::default() }),
+            vignette: None,
+            stages: Default::default(),
+        }
+    }
+    fn old_rw2() -> lightcraft_catalog::Photo {
+        // as an older build catalogued it: no lens data, correction off
+        lightcraft_catalog::Photo::new(
+            lightcraft_catalog::PhotoId(1),
+            Source::File { path: "/x.rw2".into() },
+            "x.rw2",
+            "RW2",
+            4592,
+            3448,
+            "2026-10-06T00:00:00",
+        )
+    }
+
+    #[test]
+    fn reload_adds_lens_data_and_turns_the_correction_on_for_an_untouched_photo() {
+        let ph = old_rw2();
+        let info = crate::media::ProbeInfo { embedded_lens: Some(lens()), ..Default::default() };
+        let ops = lens_ops(ph.id, &ph, &info);
+        assert!(matches!(ops.first(), Some(Op::SetEmbeddedLens { lens: Some(_), .. })), "{ops:?}");
+        let Some(Op::SetDevelop { settings, .. }) = ops.get(1) else { panic!("{ops:?}") };
+        assert!(settings.optics.lens_profile);
+        // once applied, the photo is still "unedited" and has what import would have given it
+        let mut c = lightcraft_catalog::Catalog::default();
+        c.apply(Op::AddPhoto { photo: Box::new(ph) }).unwrap();
+        for op in ops {
+            c.apply(op).unwrap();
+        }
+        let after = c.photo(lightcraft_catalog::PhotoId(1)).unwrap();
+        assert_eq!(after.embedded_lens, Some(lens()));
+        assert!(!after.is_edited());
+        assert_eq!(*after.develop, after.camera_defaults());
+        assert!(lens_ops(after.id, after, &info).is_empty(), "nothing more to do the second time");
+    }
+
+    #[test]
+    fn reload_adds_lens_data_but_keeps_an_edited_photos_settings() {
+        let mut ph = old_rw2();
+        let mut d = (*ph.develop).clone();
+        d.light.exposure = 0.7;
+        ph.develop = std::sync::Arc::new(d);
+        assert!(ph.is_edited());
+        let info = crate::media::ProbeInfo { embedded_lens: Some(lens()), ..Default::default() };
+        let ops = lens_ops(ph.id, &ph, &info);
+        assert!(matches!(ops.as_slice(), [Op::SetEmbeddedLens { lens: Some(_), .. }]), "{ops:?}");
+    }
+
+    #[test]
+    fn reload_leaves_a_photo_whose_user_switched_the_correction_off_alone() {
+        let mut ph = old_rw2();
+        ph.embedded_lens = Some(lens());
+        let mut d = ph.camera_defaults();
+        d.optics.lens_profile = false;
+        ph.develop = std::sync::Arc::new(d);
+        let info = crate::media::ProbeInfo { embedded_lens: Some(lens()), ..Default::default() };
+        assert!(lens_ops(ph.id, &ph, &info).is_empty());
+    }
+
+    /// End to end on a public Panasonic raw (skipped without the corpus): a catalog from before the lens data was read
+    /// gets it on Reload, the render changes to the corrected one, and Undo takes it all back.
+    #[test]
+    fn corpus_reload_corrects_an_rw2_catalogued_without_lens_data() {
+        let root = std::env::var_os("LIGHTCRAFT_CORPUS")
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|| Path::new(env!("CARGO_MANIFEST_DIR")).join("../../corpus"));
+        let f = root.join("raw/rw2-panasonic-gx80.rw2");
+        if !f.exists() {
+            eprintln!("skip: {} absent", f.display());
+            return;
+        }
+        let mut s = Session::new().with_fs();
+        s.execute("library.import", &json!({"paths": [f.to_string_lossy()]})).unwrap();
+        let id = s.active().unwrap();
+        let ph = s.catalog.photo(id).unwrap().clone();
+        assert!(ph.embedded_lens.is_some() && ph.develop.optics.lens_profile, "import reads it");
+        // back to how 0.4.0 catalogued it
+        let mut old = (*ph.develop).clone();
+        old.optics.lens_profile = false;
+        s.catalog.apply(Op::SetEmbeddedLens { id, lens: None }).unwrap();
+        s.catalog.apply(Op::SetDevelop { id, settings: std::sync::Arc::new(old), label: "x".into(), edited: None }).unwrap();
+        s.media.forget(id);
+        let before = s.render_now(id, 160, 120).unwrap().image.data;
+        let r = s.execute("photo.reload", &json!({"ids": [id.0]})).unwrap();
+        assert_eq!(r["reloaded"], json!([id.0]));
+        let now = s.catalog.photo(id).unwrap().clone();
+        assert_eq!(now.embedded_lens, ph.embedded_lens);
+        assert!(now.develop.optics.lens_profile && !now.is_edited());
+        assert_ne!(s.render_now(id, 160, 120).unwrap().image.data, before, "the corrected render differs");
+        s.execute("edit.undo", &json!({})).unwrap();
+        let undone = s.catalog.photo(id).unwrap();
+        assert!(undone.embedded_lens.is_none() && !undone.develop.optics.lens_profile, "one undo step");
     }
 }

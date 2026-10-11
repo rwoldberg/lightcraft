@@ -21,8 +21,39 @@ pub fn file_name(p: &Photo) -> String {
     format!("{:032x}.lcsp", h.0)
 }
 
+/// The default sharded location of a proxy. A two-character hex prefix bounds each
+/// folder to about 1/256 of the library's smart previews.
+pub fn sharded_file_path(dir: &Path, p: &Photo) -> PathBuf {
+    let name = file_name(p);
+    match name.get(..2) {
+        Some(shard) => dir.join(shard).join(&name),
+        None => dir.join(&name),
+    }
+}
+
+/// Read an existing proxy in either layout. New proxies use the sharded location; previews
+/// made by older releases still load and can be moved with smartPreviewsLocation.
+pub fn file_path(dir: &Path, p: &Photo) -> PathBuf {
+    existing_file_path(dir, sharded_file_path(dir, p))
+}
+
+/// Resolve a sharded path to an older flat file when present. Call only off the UI thread:
+/// checking a removable drive synchronously could stall drawing.
+pub fn existing_file_path(dir: &Path, sharded: PathBuf) -> PathBuf {
+    if sharded.exists() {
+        return sharded;
+    }
+    let Some(name) = sharded.file_name() else { return sharded };
+    let legacy = dir.join(name);
+    if legacy.exists() { legacy } else { sharded }
+}
+
 /// The most header [`is_valid`] reads (the JSON line before the JPEG).
 const HEADER_MAX: u64 = 4096;
+
+/// The header field that records which version of the camera-look fit (`camera_preview::LOOK_VERSION`)
+/// wrote the proxy's pixels (colour matrix and profile are baked into them) and stored tone curve.
+const LOOK_FIELD: &str = "look_version";
 
 /// Encode a source image (and the decoder's camera tone curve, if any) as a smart preview.
 pub fn encode(img: &Rgb32f, tone: Option<&CameraTone>) -> Result<Vec<u8>, String> {
@@ -53,7 +84,7 @@ pub fn encode(img: &Rgb32f, tone: Option<&CameraTone>) -> Result<Vec<u8>, String
     )
     .map_err(|e| e.to_string())?;
     let mut out = MAGIC.to_vec();
-    let mut head = serde_json::json!({"w": img.width, "h": img.height, "scale": scale});
+    let mut head = serde_json::json!({"w": img.width, "h": img.height, "scale": scale, LOOK_FIELD: crate::camera_preview::LOOK_VERSION});
     if let Some(t) = tone {
         head["tone"] = serde_json::to_value(t).map_err(|e| e.to_string())?;
     }
@@ -100,12 +131,45 @@ pub fn check_writable(dir: &Path) -> Result<(), String> {
     Ok(())
 }
 
+/// The owned proxy files in both layouts. Do not follow symlinked directories or
+/// traverse unrelated folders inside a user-selected smart preview directory.
+fn files(dir: &Path) -> Vec<PathBuf> {
+    let Ok(entries) = std::fs::read_dir(dir) else { return Vec::new() };
+    let mut found = Vec::new();
+    for e in entries.flatten() {
+        let Ok(kind) = e.file_type() else { continue };
+        if kind.is_file() && e.path().extension().is_some_and(|ext| ext == "lcsp") {
+            found.push(e.path()); // legacy layout
+        } else if kind.is_dir() {
+            let shard_name = e.file_name();
+            let Some(shard) = shard_name.to_str() else { continue };
+            if shard.len() != 2 || !shard.bytes().all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase()) {
+                continue;
+            }
+            let Ok(children) = std::fs::read_dir(e.path()) else { continue };
+            for child in children.flatten() {
+                let name = child.file_name();
+                let Some(name) = name.to_str() else { continue };
+                let Some(stem) = name.strip_suffix(".lcsp") else { continue };
+                if stem.len() == 32
+                    && stem.starts_with(shard)
+                    && stem.bytes().all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
+                    && child.file_type().is_ok_and(|kind| kind.is_file())
+                {
+                    found.push(child.path());
+                }
+            }
+        }
+    }
+    found
+}
+
 /// The number of smart previews in `dir` and their total size in bytes.
 pub fn stats(dir: &Path) -> (usize, u64) {
-    let Ok(rd) = std::fs::read_dir(dir) else { return (0, 0) };
-    rd.flatten()
-        .filter(|e| e.path().extension().is_some_and(|x| x == "lcsp"))
-        .fold((0, 0), |(n, b), e| (n + 1, b + e.metadata().map_or(0, |m| m.len())))
+    files(dir).into_iter().fold((0usize, 0u64), |(count, bytes), path| {
+        let size = std::fs::metadata(path).map_or(0, |m| m.len());
+        (count.saturating_add(1), bytes.saturating_add(size))
+    })
 }
 
 /// What to do with the smart previews in the old folder when the location changes.
@@ -136,24 +200,32 @@ pub fn migrate(from: &Path, to: &Path, what: Existing) -> (usize, Vec<String>) {
     if what == Existing::Leave {
         return (done, failed);
     }
-    let Ok(rd) = std::fs::read_dir(from) else { return (done, failed) };
-    for e in rd.flatten().filter(|e| e.path().extension().is_some_and(|x| x == "lcsp")) {
-        let src = e.path();
+    for src in files(from) {
+        let Some(name) = src.file_name() else { continue };
+        let dst = name
+            .to_str()
+            .and_then(|n| n.strip_suffix(".lcsp"))
+            .filter(|stem| stem.len() == 32 && stem.bytes().all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase()))
+            .map_or_else(|| to.join(name), |stem| to.join(&stem[..2]).join(name));
         let r = match what {
             Existing::Discard => std::fs::remove_file(&src),
             _ => {
-                let dst = to.join(e.file_name());
-                if is_valid(&dst) {
-                    // named by content: the complete copy already there is the same preview
-                    std::fs::remove_file(&src)
-                } else {
-                    // across drives: copied atomically (never a partial proxy at the new place)
-                    std::fs::rename(&src, &dst).or_else(|_| {
-                        std::fs::read(&src)
-                            .and_then(|b| lightcraft_catalog::safe_file::write_atomic(&dst, &b))
-                            .and_then(|()| std::fs::remove_file(&src))
-                    })
-                }
+                let parent = dst.parent().unwrap_or(to);
+                // Create only the shard, never missing parent directories on an unplugged drive.
+                let prepare = if parent.is_dir() { Ok(()) } else { std::fs::create_dir(parent) };
+                prepare.and_then(|()| {
+                    if is_valid(&dst) {
+                        // named by content: the complete copy already there is the same preview
+                        std::fs::remove_file(&src)
+                    } else {
+                        // across drives: copied atomically (never a partial proxy at the new place)
+                        std::fs::rename(&src, &dst).or_else(|_| {
+                            std::fs::read(&src)
+                                .and_then(|b| lightcraft_catalog::safe_file::write_atomic(&dst, &b))
+                                .and_then(|()| std::fs::remove_file(&src))
+                        })
+                    }
+                })
             }
         };
         match r {
@@ -185,6 +257,56 @@ pub fn is_valid(path: &Path) -> bool {
     }
     let mut end = [0u8; 2];
     f.seek(SeekFrom::End(-2)).is_ok() && f.read_exact(&mut end).is_ok() && end == [0xFF, 0xD9]
+}
+
+/// The fit version a header records: a missing, negative, fractional or otherwise malformed value
+/// counts as 0 (older than any real version).
+fn header_look_version(head: &serde_json::Value) -> u64 {
+    head.get(LOOK_FIELD).and_then(serde_json::Value::as_u64).unwrap_or(0)
+}
+
+/// Whether the complete proxy at `path` was written by an older camera-look fit than this build's
+/// (so its stored curve, and the colour baked into its pixels, are out of date). A proxy from a
+/// newer build is left alone (rebuilding it here would only undo that build's work), as is one
+/// that can't be read: those are [`is_valid`]'s business.
+pub fn is_stale(path: &Path) -> bool {
+    use std::io::Read;
+    if !is_valid(path) {
+        return false;
+    }
+    let Ok(f) = std::fs::File::open(path) else { return false };
+    let mut head = Vec::with_capacity(1024);
+    if f.take(HEADER_MAX).read_to_end(&mut head).is_err() {
+        return false;
+    }
+    let Some(rest) = head.strip_prefix(MAGIC) else { return false };
+    let Some(nl) = rest.iter().position(|b| *b == b'\n') else { return false };
+    rest.get(..nl)
+        .and_then(|h| serde_json::from_slice::<serde_json::Value>(h).ok())
+        .is_some_and(|h| header_look_version(&h) < u64::from(crate::camera_preview::LOOK_VERSION))
+}
+
+/// The marker file in a smart previews folder: the `LOOK_VERSION` its proxies were last checked
+/// at ([`look_checked`]).
+const LOOK_MARKER: &str = "look-version";
+
+/// Whether the smart previews folder `dir` has been checked for stale proxies at this build's
+/// camera-look fit version (or a newer one). A missing or unreadable marker counts as not.
+pub fn look_checked(dir: &Path) -> bool {
+    use std::io::Read;
+    let Ok(f) = std::fs::File::open(dir.join(LOOK_MARKER)) else { return false };
+    let mut text = String::new();
+    if f.take(64).read_to_string(&mut text).is_err() {
+        return false;
+    }
+    text.trim().parse::<u64>().is_ok_and(|v| v >= u64::from(crate::camera_preview::LOOK_VERSION))
+}
+
+/// Record that the proxies in `dir` were checked at this build's camera-look fit version.
+pub fn mark_look_checked(dir: &Path) -> Result<(), String> {
+    let path = dir.join(LOOK_MARKER);
+    lightcraft_catalog::safe_file::write_atomic(&path, format!("{}\n", crate::camera_preview::LOOK_VERSION).as_bytes())
+        .map_err(|e| format!("{}: {e}", path.display()))
 }
 
 /// Load the proxy at `path`.
@@ -231,6 +353,30 @@ mod tests {
         assert!(a.join("note.txt").exists(), "only smart previews are touched");
         assert_eq!(migrate(&b, &a, Existing::Discard).0, 1);
         assert_eq!(stats(&b).0, 0);
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn sharded_and_legacy_proxies_are_counted_and_moved() {
+        let base = temp("shards");
+        let from = base.join("from");
+        let to = base.join("to");
+        std::fs::create_dir_all(from.join("a1")).unwrap();
+        std::fs::create_dir(&to).unwrap();
+        let old = "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2.lcsp";
+        let new = "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1.lcsp";
+        std::fs::write(from.join(old), b"legacy").unwrap();
+        std::fs::write(from.join("a1").join(new), b"sharded").unwrap();
+        std::fs::write(from.join("a1").join("notes.txt"), b"user file").unwrap();
+        std::fs::write(from.join("notes.lcsp.txt"), b"keep").unwrap();
+        assert_eq!(stats(&from), (2, 13));
+        let (moved, failed) = migrate(&from, &to, Existing::Move);
+        assert_eq!((moved, failed), (2, Vec::<String>::new()));
+        assert_eq!(stats(&from), (0, 0));
+        assert_eq!(stats(&to), (2, 13));
+        assert_eq!(std::fs::read(to.join("b2").join(old)).unwrap(), b"legacy");
+        assert_eq!(std::fs::read(to.join("a1").join(new)).unwrap(), b"sharded");
+        assert!(from.join("a1").join("notes.txt").exists());
         let _ = std::fs::remove_dir_all(&base);
     }
 

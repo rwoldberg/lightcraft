@@ -1,7 +1,7 @@
 //! Develop commands. All operate on the active photo unless `ids` are given (sync).
 
 use lightcraft_catalog::{Op, PhotoId, Version};
-use lightcraft_develop::{DevelopSettings, Preset, Section, SettingsGroup, Treatment, Upright, WbMode, controls};
+use lightcraft_develop::{DevelopSettings, Preset, ProcessVersion, Section, SettingsGroup, Treatment, Upright, WbMode, controls};
 use lightcraft_geom::{CropGeometry, CropHandle, Point, Rect, crop_fit_angle, drag_crop};
 use serde_json::{Value, json};
 
@@ -36,6 +36,17 @@ fn crop_dims(s: &Session, id: PhotoId) -> (f64, f64) {
     let o = p.map(|p| p.develop.orientation).unwrap_or_default();
     if o.swaps_axes() { (h, w) } else { (w, h) }
 }
+
+/// After a generic control write (`develop.set`, `develop.adjust`, …) that touched `crop.angle`:
+/// refit the crop as `crop.straighten` does, from the crop it had `before`, so the box never takes in
+/// canvas outside the photo (issue #742).
+fn refit_crop_angle(touched: bool, before: CropGeometry, d: &mut DevelopSettings, (w, h): (f64, f64)) {
+    if touched {
+        d.crop.geometry = before.with_angle(d.crop.geometry.angle, w, h);
+    }
+}
+
+const CROP_ANGLE: &str = "crop.angle";
 
 /// `v` as a list of numbers; `None` unless it is an array of nothing but numbers.
 fn numbers(v: Option<&Value>) -> Option<Vec<f64>> {
@@ -74,6 +85,49 @@ fn set_aspect(d: &mut DevelopSettings, w: f64, h: f64, aspect: Option<(u32, u32)
     d.crop.geometry = crop_fit_angle(w, h, angle, a);
 }
 
+/// Photo `id` is on an older rendering process than [`ProcessVersion::LATEST`].
+fn outdated(s: &Session, id: PhotoId) -> bool {
+    s.catalog.photo(id).is_some_and(|p| p.develop.process.is_outdated())
+}
+
+fn already_current() -> String {
+    format!("already on the current process (version {})", ProcessVersion::LATEST.0)
+}
+
+/// Update to Current Process applies to the selection (the selected photos, else the active
+/// photo): one of them is on an older rendering process. Calls that name their photos are
+/// checked by the command instead (`explicit_targets`).
+fn has_outdated_process(s: &Session) -> std::result::Result<(), String> {
+    has_selection(s)?;
+    let sel = &s.selection;
+    let targets = if sel.ids.is_empty() { sel.active.as_slice() } else { sel.ids.as_slice() };
+    if targets.iter().any(|id| outdated(s, *id)) { Ok(()) } else { Err(already_current()) }
+}
+
+/// The photos a call names (`ids`, or `id`), each of which must be in the library; `None` when it
+/// names none (the selection applies).
+fn named_photos(s: &Session, p: &Value, c: &str) -> Result<Option<Vec<PhotoId>>> {
+    if !super::names_photos(p) {
+        return Ok(None);
+    }
+    let given = match p.get("ids").filter(|v| !v.is_null()) {
+        Some(Value::Array(a)) => a.clone(),
+        Some(_) => return Err(bad(c, "`ids` must be a list of photo ids")),
+        None => p.get("id").cloned().into_iter().collect(),
+    };
+    if given.is_empty() {
+        return Err(bad(c, "`ids` names no photos"));
+    }
+    let ids = given
+        .iter()
+        .map(|v| match v.as_u64().map(PhotoId) {
+            Some(id) if s.catalog.photo(id).is_some() => Ok(id),
+            _ => Err(bad(c, format!("no such photo {v}"))),
+        })
+        .collect::<Result<Vec<_>>>()?;
+    Ok(Some(ids))
+}
+
 /// The user preset named by `p.id` (built-ins can't be changed).
 fn user_preset<'a>(s: &'a mut Session, p: &Value, c: &str) -> Result<&'a mut Preset> {
     let pid = str_param(p, "id").ok_or_else(|| bad(c, "missing id"))?;
@@ -103,7 +157,7 @@ pub fn specs() -> Vec<CommandSpec> {
             "Set Develop Values",
             [],
             None,
-            "{control?: controlId, value?: number, values?: {controlId: number}, ids?: [photo]} — see develop.controls",
+            "{control?: controlId, value?: number, values?: {controlId: number}, ids?: [photo]} — see develop.controls; `crop.angle` turns the crop as crop.straighten does (kept if it still fits, else the largest of its aspect inside the photo)",
             has_active,
             |s, p| {
                 let mut vals: Vec<(String, f64)> = Vec::new();
@@ -124,10 +178,15 @@ pub fn specs() -> Vec<CommandSpec> {
                     }
                 }
                 let label = if vals.len() == 1 { controls::find(&vals[0].0).map(|c| c.label).unwrap_or("Edit").to_string() } else { "Edit".into() };
-                let apply = |d: &mut DevelopSettings, info: &lightcraft_pipeline::SourceInfo| {
-                    if d.wb.mode == WbMode::AsShot && vals.iter().any(|(k, _)| k == "wb.temp" || k == "wb.tint") {
-                        d.wb.temp = info.as_shot_temp;
-                        d.wb.tint = info.as_shot_tint;
+                let angle = vals.iter().any(|(k, _)| k == CROP_ANGLE);
+                let apply = |d: &mut DevelopSettings, info: &lightcraft_pipeline::SourceInfo, dims: (f64, f64)| {
+                    let before = d.crop.geometry;
+                    if vals.iter().any(|(k, _)| k == "wb.temp" || k == "wb.tint") {
+                        lightcraft_pipeline::local::normalize_wb(d, info);
+                        if d.wb.mode == WbMode::AsShot {
+                            d.wb.temp = info.as_shot_temp;
+                            d.wb.tint = info.as_shot_tint;
+                        }
                     }
                     for (k, v) in &vals {
                         controls::set(d, k, *v);
@@ -135,6 +194,7 @@ pub fn specs() -> Vec<CommandSpec> {
                             d.wb.mode = WbMode::Custom;
                         }
                     }
+                    refit_crop_angle(angle, before, d, dims);
                 };
                 if let Some(ids) = p.get("ids").and_then(Value::as_array) {
                     let ids: Vec<PhotoId> = ids.iter().filter_map(Value::as_u64).map(PhotoId).collect();
@@ -144,7 +204,7 @@ pub fn specs() -> Vec<CommandSpec> {
                         .filter_map(|(id, d)| {
                             let mut d = (*d).clone();
                             let info = s.source_info(id);
-                            apply(&mut d, &info);
+                            apply(&mut d, &info, crop_dims(s, id));
                             s.develop_op(id, d, &label)
                         })
                         .collect();
@@ -153,8 +213,9 @@ pub fn specs() -> Vec<CommandSpec> {
                 }
                 let id = active(s, "develop.set")?;
                 let info = s.source_info(id);
+                let dims = crop_dims(s, id);
                 edit(s, "develop.set", &label, |d| {
-                    apply(d, &info);
+                    apply(d, &info, dims);
                     Ok(())
                 })
             }
@@ -163,9 +224,12 @@ pub fn specs() -> Vec<CommandSpec> {
             let c = str_param(p, "control").ok_or_else(|| bad("develop.adjust", "missing control"))?.to_string();
             let spec = controls::find(&c).ok_or_else(|| bad("develop.adjust", "unknown control"))?;
             let delta = f64_req(p, "delta", "develop.adjust")?;
-            let info = s.source_info(active(s, "develop.adjust")?);
+            let id = active(s, "develop.adjust")?;
+            let (info, dims) = (s.source_info(id), crop_dims(s, id));
             edit(s, "develop.adjust", spec.label, |d| {
+                let before = d.crop.geometry;
                 if c == "wb.temp" || c == "wb.tint" {
+                    lightcraft_pipeline::local::normalize_wb(d, &info);
                     if d.wb.mode == WbMode::AsShot {
                         d.wb.temp = info.as_shot_temp;
                         d.wb.tint = info.as_shot_tint;
@@ -174,6 +238,7 @@ pub fn specs() -> Vec<CommandSpec> {
                 }
                 let v = controls::get(d, &c).unwrap_or(spec.default);
                 controls::set(d, &c, v + delta);
+                refit_crop_angle(c == CROP_ANGLE, before, d, dims);
                 Ok(())
             })
         }),
@@ -196,19 +261,62 @@ pub fn specs() -> Vec<CommandSpec> {
                     let fresh = match look {
                         Some(l) => (*l).clone(),
                         None => {
+                            // the photo's built-in defaults (raws: capture sharpening and colour noise
+                            // reduction, embedded lens corrections), as at import, with the white balance
+                            // of its current as-shot reference
                             let info = s.source_info(id);
-                            DevelopSettings {
-                                wb: lightcraft_develop::WhiteBalance { mode: WbMode::AsShot, temp: info.as_shot_temp, tint: info.as_shot_tint },
-                                ..Default::default()
-                            }
+                            let defaults = s.catalog.photo(id).map(|p| p.camera_defaults()).unwrap_or_default();
+                            let mut fresh = DevelopSettings {
+                                wb: lightcraft_develop::WhiteBalance {
+                                    mode: WbMode::AsShot,
+                                    temp: info.as_shot_temp,
+                                    tint: info.as_shot_tint,
+                                    ..Default::default()
+                                },
+                                ..defaults
+                            };
+                            lightcraft_pipeline::local::normalize_wb(&mut fresh, &info);
+                            fresh
                         }
                     };
-                    s.develop_op(id, fresh, "Reset")
+                    // a fresh start renders with the current process (a section or slider reset doesn't change it)
+                    s.develop_op(id, DevelopSettings { process: ProcessVersion::LATEST, ..fresh }, "Reset")
                 })
                 .collect();
             s.commit("Reset", Op::Batch { ops })?;
             ok()
         }),
+        CommandSpec {
+            explicit_targets: true,
+            ..cmd!(
+                "develop.updateProcess",
+                "Update to Current Process",
+                ["Photo"],
+                None,
+                "{ids?}: moves the target photos (`ids`, else the selection) that are on an older rendering process to the current one, as one undo step (their look can change; the sliders keep their values; see docs/process-versions.md). Enabled while a selected photo is on an older process; named photos are checked themselves (each must exist, one must be on an older process) → {changed, process}",
+                has_outdated_process,
+                |s, p| {
+                    const C: &str = "develop.updateProcess";
+                    const LABEL: &str = "Update to Current Process";
+                    let targets = match named_photos(s, p, C)? {
+                        Some(ids) if !ids.iter().any(|id| outdated(s, *id)) => return Err(crate::EngineError::Disabled(C.into(), already_current())),
+                        Some(ids) => ids,
+                        None => s.targets(p),
+                    };
+                    let ops: Vec<Op> = targets
+                        .into_iter()
+                        .filter_map(|id| s.develop_of(id).map(|d| (id, d)))
+                        .filter(|(_, d)| d.process.is_outdated())
+                        .filter_map(|(id, d)| s.develop_op(id, DevelopSettings { process: ProcessVersion::LATEST, ..(*d).clone() }, LABEL))
+                        .collect();
+                    let n = ops.len();
+                    if n > 0 {
+                        s.commit(LABEL, Op::Batch { ops })?;
+                    }
+                    Ok(json!({"changed": n, "process": ProcessVersion::LATEST}))
+                }
+            )
+        },
         cmd!(
             "develop.resetSection",
             "Reset Section",
@@ -227,8 +335,11 @@ pub fn specs() -> Vec<CommandSpec> {
         cmd!("develop.resetControl", "Reset Control", [], None, "{control}", has_active, |s, p| {
             let c = str_param(p, "control").ok_or_else(|| bad("develop.resetControl", "missing control"))?.to_string();
             let spec = controls::find(&c).ok_or_else(|| bad("develop.resetControl", "unknown control"))?;
+            let dims = crop_dims(s, active(s, "develop.resetControl")?);
             edit(s, "develop.resetControl", spec.label, |d| {
+                let before = d.crop.geometry;
                 controls::set(d, &c, spec.default);
+                refit_crop_angle(c == CROP_ANGLE, before, d, dims);
                 Ok(())
             })
         }),
@@ -302,7 +413,7 @@ pub fn specs() -> Vec<CommandSpec> {
                     m => m
                         .preset()
                         .map(|(t, ti)| {
-                            // presets are relative to daylight for rendered files
+                            // presets are Kelvin on raws with that scale, relative to daylight (6500 K = as shot) elsewhere
                             if info.raw && !info.relative_wb { (t, ti) } else { (6500.0 * t / 5500.0, ti) }
                         })
                         .unwrap_or((info.as_shot_temp, info.as_shot_tint)),
@@ -312,6 +423,7 @@ pub fn specs() -> Vec<CommandSpec> {
                 // The resolved temperature/tint is stored, so rendering never depends on the mode; the
                 // mode is kept for the UI's WB dropdown.
                 edit(s, "develop.wb", "White Balance", |d| {
+                    lightcraft_pipeline::local::normalize_wb(d, &info);
                     d.wb.mode = mode;
                     d.wb.temp = t.clamp(2000.0, 50000.0);
                     d.wb.tint = tint.clamp(-150.0, 150.0);
@@ -341,6 +453,7 @@ pub fn specs() -> Vec<CommandSpec> {
             let patch = lightcraft_raster::Rgb32f::filled(4, 4, acc);
             let (t, tint) = lightcraft_pipeline::auto::auto_wb(&patch, &info);
             edit(s, "develop.wbPick", "White Balance", |d| {
+                lightcraft_pipeline::local::normalize_wb(d, &info);
                 d.wb.mode = WbMode::Custom;
                 d.wb.temp = t;
                 d.wb.tint = tint;
@@ -414,10 +527,12 @@ pub fn specs() -> Vec<CommandSpec> {
                     }
                     d.crop.geometry.rect = Rect::new(v[0].min(v[2]), v[1].min(v[3]), v[0].max(v[2]), v[1].max(v[3]));
                 }
-                if let Some(a) = p.get("angle").and_then(Value::as_f64) {
-                    d.crop.geometry.angle = a.clamp(-45.0, 45.0);
-                }
-                d.crop.geometry = d.crop.geometry.constrained(w, h);
+                let angle = p.get("angle").and_then(Value::as_f64).map(|a| a.clamp(-45.0, 45.0));
+                d.crop.geometry = match (p.get("rect"), angle) {
+                    // a new angle alone turns the crop as Straighten does (issue #742)
+                    (None, Some(a)) => d.crop.geometry.with_angle(a, w, h),
+                    (_, a) => CropGeometry { angle: a.unwrap_or(d.crop.geometry.angle), ..d.crop.geometry }.constrained(w, h),
+                };
                 Ok(())
             })
         }),
@@ -426,7 +541,7 @@ pub fn specs() -> Vec<CommandSpec> {
             "Drag Crop Handle",
             [],
             None,
-            "{handle: topLeft|topRight|bottomRight|bottomLeft|top|right|bottom|left|move | 0..8, from: [x,y], to: [x,y] (normalized, straightened frame), start?: [x0,y0,x1,y1] (default: the current crop)} — drags a crop handle; stops at the image edge, keeps the opposite edges, honours the aspect lock",
+            "{handle: topLeft|topRight|bottomRight|bottomLeft|top|right|bottom|left|move | 0..8, from: [x,y], to: [x,y] (normalized, straightened frame), start?: [x0,y0,x1,y1] (default: the current crop), keepRatio?: bool (default false)} — drags a crop handle; stops at the image edge, keeps the opposite edges, honours the aspect lock; keepRatio holds the frame's current proportions for this drag even with the lock off (the UI sends it while Shift is held)",
             has_active,
             |s, p| {
                 let id = active(s, "crop.drag")?;
@@ -451,11 +566,13 @@ pub fn specs() -> Vec<CommandSpec> {
                     }
                     _ => return Err(bad("crop.drag", "`start` needs 4 numbers")),
                 };
+                let keep_ratio = bool_or(p, "keepRatio", false);
                 edit(s, "crop.drag", "Crop", |d| {
                     let start = CropGeometry { rect: given.unwrap_or(d.crop.geometry.rect), angle: d.crop.geometry.angle };
                     // A locked crop keeps the shape it has: the lock stores a width:height tuple whose
                     // orientation is reinterpreted per image, so the frame itself is the truth.
-                    let ratio = d.crop.aspect.and(Some(start.rect_px(w, h).aspect())).filter(|a| a.is_finite() && *a > 0.0);
+                    // `keepRatio` (Shift held) asks for the same thing for one drag without touching the lock.
+                    let ratio = (d.crop.aspect.is_some() || keep_ratio).then(|| start.rect_px(w, h).aspect()).filter(|a| a.is_finite() && *a > 0.0);
                     d.crop.geometry = drag_crop(start, handle, from, to, w, h, ratio);
                     Ok(())
                 })
@@ -473,11 +590,8 @@ pub fn specs() -> Vec<CommandSpec> {
                 let (w, h) = crop_dims(s, id);
                 let angle = f64_req(p, "angle", "crop.straighten")?.clamp(-45.0, 45.0);
                 edit(s, "crop.straighten", "Straighten", |d| {
-                    let r = d.crop.geometry.rect_px(w, h);
-                    let fit = crop_fit_angle(w, h, angle, Some(r.width() / r.height()));
-                    // keep the current crop size if it still fits, else shrink
-                    let cand = CropGeometry { rect: d.crop.geometry.rect, angle };
-                    d.crop.geometry = if cand.is_within_image(w, h) { cand } else { fit };
+                    // keep the current crop if it still fits, else the largest of its aspect that does
+                    d.crop.geometry = d.crop.geometry.with_angle(angle, w, h);
                     Ok(())
                 })
             }
@@ -572,6 +686,33 @@ pub fn specs() -> Vec<CommandSpec> {
                 Ok(())
             })
         }),
+        // ---- HDR editing
+        cmd!(
+            "develop.hdr",
+            "HDR",
+            [],
+            None,
+            "{enabled?: bool (default: toggle), maxEv?: number 0..5 (headroom limit, stops above SDR white)} — HDR editing: highlights above SDR white for HDR exports and displays; every SDR render uses the SDR rendition (the hdr.sdr* controls)",
+            has_active,
+            |s, p| {
+                let id = active(s, "develop.hdr")?;
+                let cur = s.develop_of(id).unwrap_or_default().hdr;
+                let enabled = bool_or(p, "enabled", !cur.enabled);
+                let max_ev = match p.get("maxEv") {
+                    None => None,
+                    Some(v) => Some(v.as_f64().filter(|x| x.is_finite()).ok_or_else(|| bad("develop.hdr", "`maxEv` must be a number"))?),
+                };
+                let label = if enabled { "HDR On" } else { "HDR Off" };
+                edit(s, "develop.hdr", label, |d| {
+                    d.hdr.enabled = enabled;
+                    if let Some(m) = max_ev {
+                        d.hdr.max_ev = m.clamp(0.0, lightcraft_develop::Hdr::MAX_EV_LIMIT);
+                    }
+                    Ok(())
+                })?;
+                Ok(json!({"enabled": enabled, "maxEv": s.develop_of(id).map(|d| d.hdr.max_ev)}))
+            }
+        ),
         // ---- geometry: Upright
         cmd!(
             "geometry.upright",
@@ -745,13 +886,19 @@ pub fn specs() -> Vec<CommandSpec> {
                     .filter_map(|id| s.develop_of(id).map(|d| (id, d)))
                     .filter_map(|(id, d)| {
                         let mut nd = (*d).clone();
-                        if nd.wb.mode == WbMode::AsShot && (ctl == "wb.temp" || ctl == "wb.tint") {
+                        if ctl == "wb.temp" || ctl == "wb.tint" {
+                            // each photo on its own scale: Kelvin (an old relative value converted first) or relative
                             let info = s.source_info(id);
-                            nd.wb.temp = info.as_shot_temp;
-                            nd.wb.tint = info.as_shot_tint;
+                            lightcraft_pipeline::local::normalize_wb(&mut nd, &info);
+                            if nd.wb.mode == WbMode::AsShot {
+                                nd.wb.temp = info.as_shot_temp;
+                                nd.wb.tint = info.as_shot_tint;
+                            }
                         }
+                        let before = nd.crop.geometry;
                         let v = controls::get(&nd, &ctl).unwrap_or(spec.default);
                         controls::set(&mut nd, &ctl, v + delta);
+                        refit_crop_angle(ctl == CROP_ANGLE, before, &mut nd, crop_dims(s, id));
                         if ctl == "wb.temp" || ctl == "wb.tint" {
                             nd.wb.mode = WbMode::Custom;
                         }

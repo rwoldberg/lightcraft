@@ -723,6 +723,52 @@ fn a_photo_waits_for_its_turn_unless_pictures_are_not_made_on_their_own_or_have_
 }
 
 #[test]
+fn a_picture_that_appears_while_its_job_runs_is_ready_only_when_the_job_reports() {
+    // #719: the worker saves the picture, then tears down its thread pool before it reports. A pump in that window
+    // used to find the file and mark the photo Ready while the session still counted the job as running: Ready and
+    // busy at once, and the activity row stayed up for a photo that said it was done.
+    use std::sync::{Mutex, mpsc};
+    use std::time::Duration;
+    let mut x = setup("ready-while-running", true);
+    let id = photo(&x.s);
+    set_amount(&mut x.s, 80.0);
+    // the job loads the model afresh and waits in the loader until it is released: a worker that is at work
+    *x.s.denoise.active.as_ref().unwrap().model.lock().unwrap() = None;
+    let (entered_tx, entered_rx) = mpsc::channel();
+    let (release_tx, release_rx) = mpsc::channel::<()>();
+    let release_rx = Mutex::new(release_rx);
+    let runs = x.runs.clone();
+    x.s.denoise.loader = Arc::new(move |_, _| {
+        entered_tx.send(()).map_err(|e| e.to_string())?;
+        release_rx.lock().unwrap().recv_timeout(Duration::from_secs(10)).map_err(|e| e.to_string())?;
+        Ok(Arc::new(Dim { runs: runs.clone() }) as Arc<dyn Model>)
+    });
+    x.s.execute("denoise.pump", &json!({"pace": "full"})).unwrap();
+    entered_rx.recv_timeout(Duration::from_secs(10)).unwrap();
+    assert!(matches!(x.s.denoise_photo_state(id), PhotoState::Running { .. }));
+    assert!(x.s.denoise_busy());
+    // the picture lands on disk before the worker says so (as it does between its save and its report)
+    let (product, key) = x.s.denoise_running_product().unwrap();
+    let mut rgb = lightcraft_raster::Rgb32f::new(192, 160);
+    rgb.data.fill([0.25, 0.25, 0.25]);
+    lightcraft_denoise::product::write(&product, &rgb, &key).unwrap();
+    assert!(lightcraft_denoise::product::is_current(&product, &key));
+    x.s.denoise.touch(); // the index is also rebuilt from the folder in this window
+    let r = x.s.execute("denoise.pump", &json!({"pace": "full"})).unwrap();
+    assert!(matches!(x.s.denoise_photo_state(id), PhotoState::Running { .. }), "the job reports its own picture");
+    assert_eq!(r["ready"], 0, "{r}");
+    assert!(x.s.denoise_busy());
+    // the worker reports: ready and idle in the same pump
+    release_tx.send(()).unwrap();
+    let r = pump_until_ready(&mut x.s, 1);
+    assert_eq!(x.s.denoise_photo_state(id), PhotoState::Ready);
+    assert_eq!(r["running"], Value::Null, "{r}");
+    assert!(!x.s.denoise_busy());
+    drop(x.s);
+    let _ = std::fs::remove_dir_all(x.dir);
+}
+
+#[test]
 fn the_denoise_switch_validates_arguments_and_accepts_explicit_targets_without_selection() {
     let mut x = setup("toggle", false);
     let id = photo(&x.s);
@@ -758,4 +804,36 @@ fn the_denoise_switch_validates_arguments_and_accepts_explicit_targets_without_s
     assert_eq!(x.s.execute("denoise.toggle", &json!({"id": id.0})).unwrap()["enabled"], false);
     drop(x.s);
     let _ = std::fs::remove_dir_all(x.dir);
+}
+
+#[test]
+fn denoise_row_while_queue_is_busy() {
+    let mut x = setup("activity", true);
+    let rows = |s: &Session| s.activity.list().into_iter().filter(|t| t.kind == "denoise").collect::<Vec<_>>();
+    let r = x.s.execute("denoise.pump", &json!({"pace": "full"})).unwrap();
+    assert!(rows(&x.s).is_empty(), "nothing to make, no row: {r}");
+    set_amount(&mut x.s, 100.0);
+    let mut shown = false;
+    for _ in 0..600 {
+        let r = x.s.execute("denoise.pump", &json!({"pace": "full"})).unwrap();
+        let rows = rows(&x.s);
+        // (what the pump left running or queued is what the row reflects until the next pump)
+        if x.s.denoise_busy() {
+            assert_eq!(rows.len(), 1, "{r}");
+            assert_eq!((rows[0].label.as_str(), rows[0].cancellable, rows[0].unit), ("AI Denoise", false, crate::activity::Unit::Percent), "{r}");
+            if !r["running"].is_null() {
+                assert_eq!(rows[0].detail, "ramp.dng", "{r}");
+            }
+            shown = true;
+        } else {
+            assert!(rows.is_empty(), "{r}");
+        }
+        if r["ready"].as_u64() >= Some(1) {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+    assert!(shown, "the photo never showed a row");
+    assert!(rows(&x.s).is_empty(), "the row goes once the photo is made");
+    let _ = std::fs::remove_dir_all(&x.dir);
 }

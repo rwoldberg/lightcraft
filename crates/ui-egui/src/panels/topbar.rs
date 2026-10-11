@@ -53,7 +53,8 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
             if app.integrated_titlebar {
                 window_handle(app, ui, full, left as f32, 12.0);
             }
-            let mut sw = 640.0f32.min(full.width() - 460.0).max(200.0);
+            // room for the filter icon and the six icons on the right
+            let mut sw = 640.0f32.min(full.width() - 540.0).max(200.0);
             if !app.native_menu {
                 // leave room for the in-window menus left of the (centred) search field
                 let menus_right = full.left() + 140.0 + crate::menubar::bar_width(ui) + 24.0;
@@ -79,7 +80,7 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
             });
             // search field (centred on the window)
             let sr = Rect::from_center_size(pos2(full.center().x, full.center().y), vec2(sw, 28.0));
-            let id = egui::Id::new("search-field");
+            let id = crate::text_field::id("field:search");
             if std::mem::take(&mut app.ui.focus_search) {
                 ui.memory_mut(|m| m.request_focus(id));
             }
@@ -91,7 +92,6 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
                 Stroke::new(1.0, if focused { t.accent } else { t.field_border }),
                 StrokeKind::Inside,
             );
-            register(ui.ctx(), "field:search", sr);
             let mut child =
                 ui.new_child(egui::UiBuilder::new().max_rect(sr.shrink2(vec2(10.0, 4.0))).layout(egui::Layout::left_to_right(egui::Align::Center)));
             let empty = app.ui.search.is_empty();
@@ -102,14 +102,13 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
                 paint(child.painter(), Rect::from_min_size(pos2(x0, sr.center().y - 8.0), vec2(16.0, 16.0)), Icon::Search, t.text_dim);
                 child.painter().galley(pos2(x0 + 24.0, sr.center().y - g.size().y / 2.0), g, t.text_dim);
             }
-            let resp = child.add(
-                egui::TextEdit::singleline(&mut app.ui.search)
-                    .id(id)
-                    .frame(egui::Frame::NONE)
-                    .desired_width(sr.width() - 20.0)
-                    .font(t.font(13.5))
-                    .text_color(t.text),
-            );
+            let resp = crate::text_field::TextField::singleline("field:search", &mut app.ui.search)
+                .frame(false)
+                .width(sr.width() - 20.0)
+                .font(t.font(13.5))
+                .text_color(t.text)
+                .show(&mut child)
+                .response;
             if resp.changed() {
                 let q = app.ui.search.clone();
                 let _ = app.run("library.filter", json!({"text": q}));
@@ -189,6 +188,50 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
                 }
                 x -= 40.0;
             }
+            // Appearance Mode: a click steps Auto → Light → Dark → Auto; the icon shows the mode
+            let (icon, mode) = appearance_icon(app.ui.settings.appearance_mode);
+            let r = Rect::from_center_size(pos2(x, full.center().y), vec2(28.0, 28.0));
+            let tip = format!("{}: {}", crate::i18n::tr("Appearance Mode"), crate::i18n::tr(mode));
+            let resp = ui.interact(r, egui::Id::new(("top", "appearance")), Sense::click()).on_hover_text(tip);
+            register(ui.ctx(), "icon:appearance", r);
+            paint(ui.painter(), r.shrink(5.0), icon, if resp.hovered() { t.text } else { t.icon });
+            if resp.clicked() {
+                let _ = app.run("view.appearance", json!({}));
+            }
+            resp.context_menu(|ui| {
+                let settings = ui.button(crate::i18n::tr("Appearance Settings…"));
+                register(ui.ctx(), "menu:appearanceSettings", settings.rect);
+                if settings.clicked() {
+                    let _ = app.run("app.settings", json!({"tab": "interface"}));
+                    ui.close();
+                }
+                let favorites = app.ui.settings.favorite_themes.clone();
+                for dark in [false, true] {
+                    let group: Vec<_> =
+                        crate::theme::ThemeKind::ALL.iter().filter(|k| k.is_dark() == dark && favorites.iter().any(|id| id == k.id())).collect();
+                    if !group.is_empty() {
+                        ui.separator();
+                    }
+                    for kind in group {
+                        let r = ui.selectable_label(app.ui.settings.theme(app.system_theme(ui.ctx())) == *kind, crate::i18n::tr(kind.label()));
+                        register(ui.ctx(), format!("menu:themeFavorite-{}", kind.id()), r.rect);
+                        if r.clicked() {
+                            let _ = app.run("view.theme", json!({"theme": kind.id()}));
+                            ui.close();
+                        }
+                    }
+                }
+            });
             let _ = Align2::CENTER_CENTER;
         });
+}
+
+/// The appearance button's icon and the mode's name for its tooltip.
+pub fn appearance_icon(mode: crate::state::AppearanceMode) -> (Icon, &'static str) {
+    use crate::state::AppearanceMode;
+    match mode {
+        AppearanceMode::Auto => (Icon::Monitor, "Sync with System"),
+        AppearanceMode::Light => (Icon::Sun, "Light Mode"),
+        AppearanceMode::Dark => (Icon::Moon, "Dark Mode"),
+    }
 }

@@ -169,6 +169,8 @@ fn services(originals: Originals, backend: Option<Backend>, files: Files, frozen
     let restore_backend = backend.clone();
     Services {
         picker: None,
+        pick_display_profile: None,
+        screen_profile: None,
         backup_library: Some(Box::new(move |session: &mut Session| {
             let Some(b) = backup_backend.clone() else { return Err("nothing is stored in this browser session (?store=memory)".into()) };
             // the photos' own names for the originals in the zip
@@ -213,6 +215,8 @@ fn services(originals: Originals, backend: Option<Backend>, files: Files, frozen
         // Face models need a folder to live in; the web has none.
         pick_model_file: None,
         save_preset_file: None,
+        pick_keyword_list: None,
+        save_keyword_list: None,
         pick_curve_preset_files: None,
         save_curve_preset_file: None,
         write: Some(Box::new(download)),
@@ -224,6 +228,7 @@ fn services(originals: Originals, backend: Option<Backend>, files: Files, frozen
         reveal: None,
         log_file: None,
         open_with: None,
+        check_editor: None,
         open_url: Some(Box::new(|url: &str| {
             let w = web_sys::window().ok_or("no window")?;
             w.open_with_url_and_target(url, "_blank").map(|_| ()).map_err(|_| "the browser blocked the new tab".to_string())
@@ -231,6 +236,8 @@ fn services(originals: Originals, backend: Option<Backend>, files: Files, frozen
         pick_folder: None,
         // videos don't play in the browser build yet, so there is no sound to give them
         audio: None,
+        // the browser reports prefers-color-scheme to egui
+        system_theme: None,
     }
 }
 

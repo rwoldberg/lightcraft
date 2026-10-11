@@ -43,7 +43,9 @@ fn album_json(a: &Album, all: &[Album], cat: &lightcraft_catalog::Catalog) -> Va
     if let Some(rules) = &a.smart {
         v["smart"] = json!(true);
         v["rules"] = serde_json::to_value(rules).unwrap_or_default();
-        v["rulesText"] = json!(rules.describe());
+        v["rulesText"] = json!(rules.describe_with(cat));
+        // rules that no longer check (an album they test was deleted…), as `rule 1: …`
+        v["problems"] = json!(cat.smart_album_problems(a.id).iter().map(ToString::to_string).collect::<Vec<_>>());
     }
     v
 }
@@ -57,6 +59,12 @@ fn photo_arg(s: &Session, p: &Value, c: &str) -> crate::Result<PhotoId> {
     }
 }
 
+// Catalog queries also run in the 32-bit web build. A narrowing cast wraps
+// an out-of-range offset to zero, returning the first page instead of no photos.
+fn pagination_usize(value: u64) -> usize {
+    usize::try_from(value).unwrap_or(usize::MAX)
+}
+
 pub fn specs() -> Vec<CommandSpec> {
     vec![
         cmd!(query "catalog.query", "Query Photos", [], None, "{filter?: Filter, sort?: Sort, offset?, limit?} — omit filter to list the current view", always, |s, p| {
@@ -67,8 +75,8 @@ pub fn specs() -> Vec<CommandSpec> {
             } else {
                 s.visible_cloned()
             };
-            let off = p.get("offset").and_then(Value::as_u64).unwrap_or(0) as usize;
-            let lim = p.get("limit").and_then(Value::as_u64).unwrap_or(200) as usize;
+            let off = pagination_usize(p.get("offset").and_then(Value::as_u64).unwrap_or(0));
+            let lim = pagination_usize(p.get("limit").and_then(Value::as_u64).unwrap_or(200));
             let items: Vec<Value> = ids.iter().skip(off).take(lim).filter_map(|id| s.catalog.photo(*id)).map(|p| photo_summary(p)).collect();
             Ok(json!({"total": ids.len(), "photos": items}))
         }),
@@ -149,9 +157,18 @@ pub fn specs() -> Vec<CommandSpec> {
             }
             Ok(v)
         }),
-        cmd!(query "develop.get", "Get Develop Settings", [], None, "{id?}", always, |s, p| {
+        cmd!(query "develop.get", "Get Develop Settings", [], None, "{id?} → the photo's develop settings; `process` is the rendering process they are interpreted by (see develop.updateProcess)", always, |s, p| {
             let id = photo_arg(s, p, "develop.get")?;
-            Ok(s.develop_of(id).map(|d| d.to_json()).unwrap_or(Value::Null))
+            Ok(s.develop_of(id)
+                .map(|d| {
+                    let mut v = d.to_json();
+                    // saved settings leave V1 out (`ProcessVersion::is_legacy`); here it is always stated
+                    if let Some(o) = v.as_object_mut() {
+                        o.insert("process".into(), json!(d.process));
+                    }
+                    v
+                })
+                .unwrap_or(Value::Null))
         }),
         cmd!(query "develop.controls", "List Develop Controls", [], None, "{section?} — every slider with range, default and current value", always, |s, p| {
             let d = s.active().and_then(|id| s.develop_of(id)).unwrap_or_default();
@@ -225,4 +242,18 @@ pub fn specs() -> Vec<CommandSpec> {
             Ok(Value::Array(s.journal[start..].iter().map(|(c, p)| json!({"command": c, "params": p})).collect()))
         }),
     ]
+}
+
+#[cfg(test)]
+mod pagination_tests {
+    use super::*;
+
+    #[test]
+    fn offsets_and_limits_saturate_instead_of_wrapping_on_wasm() {
+        assert_eq!(pagination_usize(0), 0);
+        assert_eq!(pagination_usize(200), 200);
+        assert_eq!(pagination_usize(u64::MAX), usize::MAX);
+        #[cfg(target_pointer_width = "32")]
+        assert_eq!(pagination_usize(u64::from(u32::MAX) + 1), usize::MAX);
+    }
 }

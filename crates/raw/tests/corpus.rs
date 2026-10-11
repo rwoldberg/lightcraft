@@ -17,6 +17,7 @@ fn corpus_root() -> PathBuf {
 const KNOWN_UNSUPPORTED: &[&str] = &[
     "cr3-",           // Unverified CRX coding variants; exact supported cases live in cr3_corpus.rs.
     "orf-olympus-em", // Olympus compressed ORF
+    "-he.nef",        // Nikon High Efficiency (HE / HE★) NEF, issue #193
     "sraw",           // Canon sRAW / mRAW
 ];
 
@@ -224,6 +225,24 @@ fn corpus_nef_compressed_matches_uncompressed() {
 
 /// raw.pixls.us has the same D7500 scene as 12- and 14-bit lossless compressed NEF. Both store black level 400 in
 /// maker note 0x003d (14-bit units): after subtracting the black level and scaling to white, the two must agree.
+/// Issue #193: the Z f's High Efficiency NEF (no `0x0096` table, a JPEG XS codestream) is named as such and keeps a
+/// full-size embedded JPEG to edit, while the same body's Lossless compressed NEF decodes.
+#[test]
+fn corpus_nef_high_efficiency_is_named() {
+    let dir = corpus_root().join("raw");
+    let (Ok(he), Ok(lossless)) = (std::fs::read(dir.join("nef-nikon-zf-he.nef")), std::fs::read(dir.join("nef-nikon-zf-lossless.nef"))) else {
+        eprintln!("skip: Z f samples absent");
+        return;
+    };
+    for result in [decode(&he).map(|_| ()), probe_info(&he).map(|_| ())] {
+        let Err(RawError::Unsupported(why)) = result else { panic!("Z f HE: expected unsupported") };
+        assert!(why.starts_with("Nikon High Efficiency NEF ("), "{why}");
+    }
+    assert!(embedded_preview(&he).is_some_and(|p| p.len() > 1 << 20), "Z f HE: no full-size preview");
+    let img = decode(&lossless).unwrap();
+    assert_eq!((img.width, img.height, img.bits), (6064, 4040, 14));
+}
+
 #[test]
 fn corpus_nef_12_bit_black_level_matches_14_bit() {
     let dir = corpus_root().join("raw");
@@ -328,17 +347,20 @@ fn corpus_proraw_sky_matte() {
 }
 
 /// Issue #148: Sony ARWs from before ~2017 carry no plain white-balance, black-level or crop tags in the raw IFD.
-/// White balance comes from the maker note's enciphered `Tag2010`, the black level from the encrypted `SR2SubIFD`
-/// and the crop from `FullImageSize`; without them the RX100 III opened bright green. Expected values: the black
-/// levels agree with each sensor's dark-pixel floor, the gains with the neutral sky of the camera JPEG.
+/// White balance and black level come from the encrypted `SR2SubIFD`, the crop from `FullImageSize`; without them
+/// the RX100 III opened bright green. Expected values: the black levels agree with each sensor's dark-pixel floor;
+/// the gains are the `SR2SubIFD`'s `WB_RGGBLevels`, within 4 % of the gains that make the camera JPEG's neutral
+/// pixels neutral (RX100 III 2.59 / 1.69, RX100 2.21 / 2.01, ILCE-7RM2 2.67 / 1.47). Until issue #535 they came
+/// from the maker note's `Tag2010` (2.61 / 1.72, 2.23 / 2.00, 2.58 / 1.46), which differs from what the camera
+/// applied on other files (see `corpus_sony_sr2_white_balance`).
 #[test]
 fn corpus_sony_pre2017_colour_metadata() {
     let dir = corpus_root().join("raw");
     // (file, black, approximate R and B gains, crop width × height)
     let cases = [
-        ("arw-sony-rx100m3.arw", 800.0, [2.61, 1.72], (5472, 3648)),
-        ("arw-sony-rx100.arw", 800.0, [2.23, 2.00], (5472, 3648)),
-        ("arw-sony-a7rm2-12bit-uncompressed.arw", 512.0, [2.58, 1.46], (7952, 5304)),
+        ("arw-sony-rx100m3.arw", 800.0, [2.55, 1.72], (5472, 3648)),
+        ("arw-sony-rx100.arw", 800.0, [2.21, 1.99], (5472, 3648)),
+        ("arw-sony-a7rm2-12bit-uncompressed.arw", 512.0, [2.58, 1.45], (7952, 5304)),
     ];
     let mut seen = 0;
     for (name, black, [r, b], (cw, ch)) in cases {
@@ -355,6 +377,253 @@ fn corpus_sony_pre2017_colour_metadata() {
         seen += 1;
     }
     eprintln!("pre-2017 Sony ARW colour metadata checked on {seen} files");
+}
+
+/// Sony ILCE-7CR (61 MP), three of the camera's raw codings of one scene on raw.pixls.us: lossless compressed L
+/// (LJ92 tiles of 2×2 cells), lossless compressed M (subsampled YCbCr, already white-balanced) and compressed
+/// (ARW2). Expected values: the files' own black level and default crop, and the as-shot gains of the camera's
+/// colour-temperature setting.
+#[test]
+fn corpus_sony_a7cr_codings() {
+    let dir = corpus_root().join("raw");
+    // (file, colour-filter layout, as-shot R and B gains, default crop x, y, width, height)
+    let cases = [
+        ("arw-sony-a7cr-lossless-l.arw", Some("RGGB"), [2.625, 1.598], (32, 20, 9504, 6336)),
+        ("arw-sony-a7cr-compressed.arw", Some("RGGB"), [2.625, 1.598], (32, 20, 9504, 6336)),
+        ("arw-sony-a7cr-lossless-m.arw", None, [1.0, 1.0], (20, 12, 6240, 4160)),
+    ];
+    let mut decoded = Vec::new();
+    for (name, cfa, [r, b], crop) in cases {
+        let bytes = match std::fs::read(dir.join(name)) {
+            Ok(bytes) => bytes,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                eprintln!("skip: {name} absent");
+                continue;
+            }
+            Err(e) => panic!("{name}: {e}"),
+        };
+        let img = decode(&bytes).unwrap_or_else(|e| panic!("{name}: {e}"));
+        assert_eq!(img.metadata.model.as_deref(), Some("ILCE-7CR"), "{name}: model");
+        assert_eq!(img.cfa.as_ref().map(|c| c.name()).as_deref(), cfa, "{name}: colour-filter layout");
+        // Bayer codings use the file's black level; the YCbCr M coding's pedestal is handled separately (#535, item 3).
+        if cfa.is_some() {
+            assert_eq!(img.black.mean(), 512.0, "{name}: black level");
+        }
+        assert!(img.white_at(0) > 15000.0, "{name}: white {} (14-bit scale)", img.white_at(0));
+        let wb = img.wb_multipliers.unwrap_or_else(|| panic!("{name}: no as-shot white balance"));
+        assert!((wb[0] - r).abs() < 0.01 && wb[1] == 1.0 && (wb[2] - b).abs() < 0.01, "{name}: white balance {wb:?}");
+        assert_eq!((img.crop.x, img.crop.y, img.crop.width, img.crop.height), crop, "{name}: default crop");
+        decoded.push((name, img));
+    }
+    // The lossless and compressed codings are two exposures of the same scene with the same framing: inside the
+    // default crop their mosaics must agree (up to the small differences between two exposures).
+    let crop_means = |img: &lightcraft_raw::RawImage| {
+        let lightcraft_raw::RawData::U16(d) = &img.data else { panic!("float data") };
+        let (w, c, b) = (img.width, img.crop, 32);
+        let mut out = Vec::new();
+        for by in 0..c.height / b {
+            for bx in 0..c.width / b {
+                let (x0, y0) = ((c.x + bx * b) & !1, (c.y + by * b) & !1);
+                let (mut s, mut n) = (0f64, 0f64);
+                for y in y0..y0 + b {
+                    for x in (x0..x0 + b).step_by(2) {
+                        s += d[y * w + x + 1 - (y & 1)] as f64;
+                        n += 1.0;
+                    }
+                }
+                out.push(s / n);
+            }
+        }
+        out
+    };
+    let bayer: Vec<_> = decoded.iter().filter(|(_, img)| img.cfa.is_some()).collect();
+    if let [(a_name, a), (b_name, b)] = bayer.as_slice() {
+        let r = correlation(&crop_means(a), &crop_means(b));
+        eprintln!("ILCE-7CR {a_name} vs {b_name}: green block correlation {r:.4}");
+        assert!(r > 0.98, "correlation {r}");
+    }
+    eprintln!("ILCE-7CR codings checked on {} files", decoded.len());
+}
+
+/// Sony ILCE-7CM2 (33 MP, issue #697), two of the camera's codings on raw.pixls.us: lossless compressed L (LJ92 tiles
+/// of 2×2 cells) and compressed "M-size" (ARW2). Only its lossless M and S codings are the downsized linear YCbCr
+/// whose 1024 pedestal 0.5.0 missed (rendering the issue's file washed out: the darkest half of a dusk scene
+/// +11 L* and blue); the compressed and uncompressed M-size files are Bayer at 4736×3132 with the recorded black
+/// 512, so a size-based rule would break them. Expected values: the files' own colour-filter layout, black and
+/// white levels, default crop and the as-shot gains of the camera's colour-temperature setting.
+#[test]
+fn corpus_sony_a7cm2_codings() {
+    let dir = corpus_root().join("raw");
+    // (file, sensor width and height, as-shot R and B gains, default crop x, y, width, height)
+    let cases = [
+        ("arw-sony-a7cm2-lossless-l.arw", (7168, 5120), [2.313, 1.654], (12, 8, 7008, 4672)),
+        ("arw-sony-a7cm2-compressed-m.arw", (4736, 3132), [2.309, 1.657], (44, 30, 4608, 3072)),
+    ];
+    let mut checked = 0;
+    for (name, (width, height), [r, b], crop) in cases {
+        let bytes = match std::fs::read(dir.join(name)) {
+            Ok(bytes) => bytes,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                eprintln!("skip: {name} absent");
+                continue;
+            }
+            Err(e) => panic!("{name}: {e}"),
+        };
+        let img = decode(&bytes).unwrap_or_else(|e| panic!("{name}: {e}"));
+        assert_eq!(probe_info(&bytes).unwrap(), img.info(), "{name}: header and full decode agree");
+        assert_eq!(img.metadata.model.as_deref(), Some("ILCE-7CM2"), "{name}: model");
+        assert_eq!((img.width, img.height, img.cpp), (width, height, 1), "{name}: sensor size");
+        assert_eq!(img.cfa.as_ref().map(|c| c.name()).as_deref(), Some("RGGB"), "{name}: colour-filter layout");
+        assert_eq!((img.black.mean(), img.white_at(0)), (512.0, 16383.0), "{name}: black and white levels");
+        let wb = img.wb_multipliers.unwrap_or_else(|| panic!("{name}: no as-shot white balance"));
+        assert!((wb[0] - r).abs() < 0.01 && wb[1] == 1.0 && (wb[2] - b).abs() < 0.01, "{name}: white balance {wb:?}");
+        assert_eq!((img.crop.x, img.crop.y, img.crop.width, img.crop.height), crop, "{name}: default crop");
+        checked += 1;
+    }
+    eprintln!("ILCE-7CM2 codings checked on {checked} files");
+}
+
+/// Issue #535: Sony black levels against the data. The SR2SubIFD keeps the black level at a position that depends
+/// on its layout (the DSLR-A500 and A700 read 365 and 975 from a fixed position, where ExifTool and the data say
+/// 512), and the downsized lossless M and S codings (linear YCbCr) sit 512 above the recorded level (1024, with
+/// white moved by the same 512). Each file's darkest 0.1 % per channel must lie just above its black level: a black
+/// level that is too low leaves a pedestal, one that is too high clips the shadows.
+#[test]
+fn corpus_sony_black_levels_sit_at_the_data_floor() {
+    use lightcraft_raw::RawData;
+    let dir = corpus_root().join("raw");
+    // (file, black, white): SR2SubIFD black at three layouts, a plain 0x7310, and the lossless L / M / S codings
+    let cases = [
+        ("arw-sony-a500.arw", 512.0, None),
+        ("arw-sony-a700.arw", 512.0, None),
+        ("arw-sony-rx100m3.arw", 800.0, None),
+        ("arw-sony-a7m4-lossless-l.arw", 512.0, Some(16383.0)),
+        ("arw-sony-a7m4-lossless-m.arw", 1024.0, Some(16895.0)),
+        ("arw-sony-a7m4-lossless-s.arw", 1024.0, Some(16895.0)),
+        // ILCE-7CM2 (#697): its compressed "M-size" coding is Bayer at the recorded 512, unlike its lossless M
+        ("arw-sony-a7cm2-lossless-l.arw", 512.0, Some(16383.0)),
+        ("arw-sony-a7cm2-compressed-m.arw", 512.0, Some(16383.0)),
+    ];
+    let mut seen = 0;
+    for (name, black, white) in cases {
+        let bytes = match std::fs::read(dir.join(name)) {
+            Ok(bytes) => bytes,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                eprintln!("skip: {name} absent");
+                continue;
+            }
+            Err(e) => panic!("{name}: {e}"),
+        };
+        let img = decode(&bytes).unwrap_or_else(|e| panic!("{name}: {e}"));
+        assert_eq!(img.black.mean(), black, "{name}: black level");
+        if let Some(white) = white {
+            assert_eq!(img.white_at(0), white, "{name}: white level");
+        }
+        let RawData::U16(ref data) = img.data else { panic!("{name}: integer samples expected") };
+        // per CFA position (2×2) or per colour sample, inside the default crop, about a million samples each
+        let channels = if img.cpp == 3 { 3 } else { 4 };
+        let (a, c) = (img.active_area, img.crop);
+        let step = (c.width * c.height / 1_000_000).max(1);
+        let mut samples = vec![Vec::new(); channels];
+        for (k, (x, y)) in (c.y..c.y + c.height).flat_map(|y| (c.x..c.x + c.width).map(move |x| (x + a.x, y + a.y))).enumerate() {
+            if (k / 2) % step != 0 {
+                continue;
+            }
+            if img.cpp == 3 {
+                for (s, v) in samples.iter_mut().enumerate() {
+                    v.push(data[(y * img.width + x) * 3 + s]);
+                }
+            } else {
+                samples[(y % 2) * 2 + x % 2].push(data[y * img.width + x]);
+            }
+        }
+        for (i, mut v) in samples.into_iter().enumerate() {
+            v.sort_unstable();
+            let floor = f32::from(v[v.len() / 1000]);
+            assert!((black - 64.0..=black + 128.0).contains(&floor), "{name}: channel {i}: darkest 0.1 % at {floor}, black level {black}");
+        }
+        seen += 1;
+    }
+    eprintln!("Sony black levels checked against the data floor on {seen} files");
+}
+
+/// Issue #535: the white balance a Sony ARW records as applied, `WB_RGGBLevels`, read from the encrypted
+/// `SR2SubIFD` when the raw IFD has no plain copy. Before, the first three opened with no white balance (green) and
+/// the last two with the maker note's `Tag2010` gains, which there follow the scene rather than the preset used.
+/// Expected levels: ExifTool's decrypted `WB_RGGBLevels` (green 1024). In brackets, the gains that make the
+/// camera JPEG's neutral pixels neutral.
+#[test]
+fn corpus_sony_sr2_white_balance() {
+    let dir = corpus_root().join("raw");
+    // (file, R and B levels)
+    let cases = [
+        ("arw-sony-a500.arw", [2212, 1416]),          // 27152-byte SR2SubIFD layout (2.04 / 1.35)
+        ("arw-sony-a33.arw", [2344, 1508]),           // 29000-byte layout (2.29 / 1.48)
+        ("arw-sony-a700.arw", [2128, 1564]),          // 62112-byte layout (too few neutral pixels)
+        ("arw-sony-a3500-5600k.arw", [2932, 1576]),   // 5600 K (2.76 / 1.53; Tag2010 1.89 / 3.08)
+        ("arw-sony-a7s-shade.arw", [2932, 1372]),     // Shade (2.90 / 1.32; Tag2010 2.63 / 1.52)
+        ("arw-sony-a900-packed12.arw", [2688, 1516]), // packed 12-bit (the maker note's plain 0x0020 block agrees)
+    ];
+    let mut seen = 0;
+    for (name, [r, b]) in cases {
+        let Ok(bytes) = std::fs::read(dir.join(name)) else {
+            eprintln!("skip: {name} absent");
+            continue;
+        };
+        let img = decode(&bytes).unwrap_or_else(|e| panic!("{name}: {e}"));
+        let wb = img.wb_multipliers.unwrap_or_else(|| panic!("{name}: no as-shot white balance"));
+        let (er, eb) = (r as f32 / 1024.0, b as f32 / 1024.0);
+        assert!((wb[0] - er).abs() < 1e-4 && wb[1] == 1.0 && (wb[2] - eb).abs() < 1e-4, "{name}: white balance {wb:?}, expected [{er}, 1, {eb}]");
+        seen += 1;
+    }
+    eprintln!("Sony SR2SubIFD white balance checked on {seen} files");
+}
+
+/// The DSLR-A900's packed 12-bit strip decodes (issue #535, item 6): 12 bits on a black of 128, and the camera
+/// JPEG's `FullImageSize` window centred in the frame, which has no padding at either edge.
+#[test]
+fn corpus_sony_a900_packed12() {
+    let name = "arw-sony-a900-packed12.arw";
+    let Ok(bytes) = std::fs::read(corpus_root().join("raw").join(name)) else {
+        eprintln!("skip: {name} absent");
+        return;
+    };
+    let img = decode(&bytes).unwrap_or_else(|e| panic!("{name}: {e}"));
+    assert_eq!((img.width, img.height, img.bits), (6080, 4048, 12));
+    assert_eq!(img.black.values, vec![128.0]);
+    let c = img.crop;
+    assert_eq!((c.x, c.y, c.width, c.height), (16, 8, 6048, 4032));
+}
+
+/// Issue #535: pre-2017 Sony bodies without crop tags shot in the camera's 16:9 mode. The ILCE-7SM2 records the
+/// 16:9 size in `FullImageSize`, the DSLR-A580 only in the Exif image size; both crops are centred vertically (each
+/// camera JPEG registered on its raw) and drop the right-edge padding, so the image matches its JPEG's aspect ratio
+/// and gets a camera look.
+#[test]
+fn corpus_sony_16x9_crops() {
+    let dir = corpus_root().join("raw");
+    let mut seen = 0;
+    for (name, (x, y, w, h)) in [("arw-sony-a7sm2-16x9.arw", (0, 232, 4240, 2384)), ("arw-sony-a580-16x9.arw", (0, 260, 4912, 2760))] {
+        let bytes = match std::fs::read(dir.join(name)) {
+            Ok(bytes) => bytes,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                eprintln!("skip: {name} absent");
+                continue;
+            }
+            Err(e) => panic!("{name}: {e}"),
+        };
+        let img = decode(&bytes).unwrap_or_else(|e| panic!("{name}: {e}"));
+        let c = img.crop;
+        assert_eq!((c.x, c.y, c.width, c.height), (x, y, w, h), "{name}: crop");
+        let jpeg = embedded_preview(&bytes).unwrap_or_else(|| panic!("{name}: no preview"));
+        let mut d = zune_jpeg::JpegDecoder::new(zune_core::bytestream::ZCursor::new(&jpeg));
+        d.decode_headers().unwrap();
+        let info = d.info().unwrap();
+        let (aspect, preview) = (c.width as f64 / c.height as f64, info.width as f64 / info.height as f64);
+        assert!((aspect / preview - 1.0).abs() < 0.02, "{name}: crop aspect {aspect} vs camera JPEG {preview}");
+        seen += 1;
+    }
+    eprintln!("Sony 16:9 crops checked on {seen} files");
 }
 
 /// The embedded JPEG as linear RGB, reduced to `gw × gh` cells.
@@ -633,6 +902,39 @@ fn corpus_fujifilm_compressed_samples() {
     eprintln!("verified {seen} Fujifilm compressed sensor arrays");
 }
 
+/// Checks each available `(name, width, height, sum, weighted)` case against the decoder's sensor array (the file's
+/// identity is checked by `cargo xtask corpus --download`); absent corpus files are skipped. Returns how many were verified.
+fn verify_sensor_arrays(cases: &[(&str, usize, usize, u64, u64)]) -> usize {
+    let dir = corpus_root().join("raw");
+    let mut seen = 0;
+    for &(name, width, height, sum, weighted) in cases {
+        let Ok(bytes) = std::fs::read(dir.join(name)) else { continue };
+        let img = decode(&bytes).unwrap_or_else(|e| panic!("{name}: {e}"));
+        assert_eq!((img.width, img.height), (width, height), "{name}");
+        let lightcraft_raw::RawData::U16(data) = img.data else { panic!("{name}: float data") };
+        let actual = data
+            .iter()
+            .enumerate()
+            .fold((0u64, 0u64), |(s, w), (i, &v)| (s.wrapping_add(u64::from(v)), w.wrapping_add((i as u64 + 1).wrapping_mul(u64::from(v)))));
+        assert_eq!(actual, (sum, weighted), "{name}: sensor samples differ from reference");
+        seen += 1;
+    }
+    seen
+}
+
+/// Regression values from LightCraft's decoder with the derived companding curve; the 12-bit codes before the curve
+/// were verified against the black-box oracle in Phase 0 (docs/arw6-compression.md). The files are CC0 from RawDB, one
+/// per geometry and compression mode.
+#[test]
+fn corpus_sony_arw6_samples() {
+    let cases: &[(&str, usize, usize, u64, u64)] = &[
+        ("arw6-sony-ilce7rm6-apsc-land-hq.arw", 6592, 4372, 85546367117, 1319631546150087499),
+        ("arw6-sony-ilce7rm6-ff-land-c.arw", 10016, 6672, 257718215153, 9636375794063042132),
+    ];
+    let seen = verify_sensor_arrays(cases);
+    eprintln!("verified {seen} Sony ARW6 sensor arrays");
+}
+
 /// The container rule for TIFF "shells" (a small IFD0 next to a private raw block) must not touch real
 /// raws: every corpus file keeps the format its maker implies, and none is described as a private block.
 #[test]
@@ -667,4 +969,167 @@ fn corpus_raws_keep_their_container_and_are_not_thumbnail_shells() {
         checked += 1;
     }
     eprintln!("{checked} corpus raws keep their container");
+}
+
+/// Matching Sony table dimensions are not evidence of a shared correction model. Exercise the
+/// actual corpus headers and decoded files as well as the synthetic model-boundary unit tests.
+#[test]
+fn sony_embedded_distortion_is_limited_to_validated_models() {
+    let root = corpus_root().join("raw");
+    let mut checked = 0;
+    for (name, model, expected) in [
+        ("arw-sony-a7rm4a-compressed.arw", "ILCE-7RM4A", 1),
+        ("arw-sony-a9m2-compressed.arw", "ILCE-9M2", 0),
+        ("arw-sony-a7m3-compressed.arw", "ILCE-7M3", 0),
+        ("arw-sony-a7m3-uncompressed.arw", "ILCE-7M3", 0),
+        ("arw-sony-a7m4-14bit.arw", "ILCE-7M4", 0),
+        ("arw-sony-a7m4-lossless-l.arw", "ILCE-7M4", 0),
+        ("arw-sony-a7m4-lossless-m.arw", "ILCE-7M4", 0),
+        ("arw-sony-a7m4-lossless-s.arw", "ILCE-7M4", 0),
+        ("arw-sony-a7rm2-12bit-uncompressed.arw", "ILCE-7RM2", 0),
+        ("arw-sony-rx100.arw", "DSC-RX100", 0),
+        ("arw-sony-rx100m3.arw", "DSC-RX100M3", 0),
+        ("arw-sony-a7cr-lossless-l.arw", "ILCE-7CR", 0),
+        ("arw-sony-a7cr-lossless-m.arw", "ILCE-7CR", 0),
+        ("arw-sony-a7cr-compressed.arw", "ILCE-7CR", 0),
+        ("arw-sony-a7rm4-14bit-compressed.arw", "ILCE-7RM4", 0),
+        ("arw-sony-a500.arw", "DSLR-A500", 0),
+        ("arw-sony-a700.arw", "DSLR-A700", 0),
+        ("arw-sony-a33.arw", "SLT-A33", 0),
+        ("arw-sony-a3500-5600k.arw", "ILCE-3500", 0),
+        ("arw-sony-a7s-shade.arw", "ILCE-7S", 0),
+        ("arw-sony-a7sm2-16x9.arw", "ILCE-7SM2", 0),
+        ("arw-sony-a580-16x9.arw", "DSLR-A580", 0),
+        ("arw-sony-a900-packed12.arw", "DSLR-A900", 0),
+    ] {
+        let path = root.join(name);
+        if !path.exists() {
+            eprintln!("skip: {} absent", path.display());
+            continue;
+        }
+        let bytes = std::fs::read(&path).unwrap();
+        let full = decode(&bytes).unwrap_or_else(|e| panic!("{name}: {e}"));
+        assert_eq!(probe_info(&bytes).unwrap(), full.info(), "{name}");
+        assert_eq!(full.metadata.model.as_deref(), Some(model), "{name}");
+        assert_eq!(full.opcodes.list3.len(), expected, "{name}: only the validated Sony model gets a distortion warp");
+        eprintln!("{name}: {expected} warp(s); header and full decode agree");
+        checked += 1;
+    }
+    eprintln!("Sony distortion model boundary: {checked} corpus files checked");
+}
+
+/// Kodak DCS520C (`crates/raw/src/vendor/kodak.rs`): the two-component lossless JPEG strip decodes through the
+/// file's response curve to a 1736 x 1160 GRBG mosaic with 12-bit white, per-position black levels and the
+/// white balance of the vendor IFD. Looks for the corpus copy, then the raw.pixls.us folder; skips without either.
+#[test]
+fn corpus_kodak_dcs520c() {
+    let name = "2573_Kodak - DCS520C - 12bit (3_2).TIF";
+    let candidates = [corpus_root().join("raw").join("kodak-dcs520c.tif"), Path::new("P:/raw-pixls/Kodak/DCS520C").join(name)];
+    let Some(bytes) = candidates.iter().find_map(|p| std::fs::read(p).ok()) else {
+        eprintln!("skip: DCS520C sample absent");
+        return;
+    };
+    assert_eq!(probe(&bytes), Some(RawFormat::KodakDcs));
+    let img = decode(&bytes).unwrap_or_else(|e| panic!("{e}"));
+    assert_eq!((img.width, img.height, img.bits), (1736, 1160, 12));
+    assert_eq!(img.cfa.as_ref().map(|c| c.name()).as_deref(), Some("GRBG"));
+    assert_eq!(img.white_at(0), 4095.0);
+    let lightcraft_raw::RawData::U16(d) = &img.data else { panic!("float data") };
+    assert_eq!(d.len(), 1736 * 1160);
+    // stored 191..=622 expands to 191..=4095
+    assert_eq!((d.iter().min().copied(), d.iter().max().copied()), (Some(191), Some(4095)));
+    // black: G and R about 220, B about 197 (the darkest 0.01% of each position)
+    let b = &img.black.values;
+    assert_eq!(b.len(), 4);
+    assert!(
+        (200.0..=235.0).contains(&b[0]) && (200.0..=235.0).contains(&b[1]) && (185.0..=210.0).contains(&b[2]) && (200.0..=235.0).contains(&b[3]),
+        "{b:?}"
+    );
+    let wb = img.wb_multipliers.expect("white balance");
+    assert!((wb[0] - 0.9587).abs() < 1e-3 && wb[1] == 1.0 && (wb[2] - 1.9913).abs() < 1e-3, "{wb:?}");
+    // no column stripes: the two greens sit in different JPEG components (G1 on even columns, G2 on odd columns), so a component mismatch would split them
+    let mean = |y0: usize, x0: usize| {
+        let (mut s, mut n) = (0f64, 0f64);
+        for y in (y0..1160).step_by(2) {
+            for x in (x0..1736).step_by(2) {
+                s += f64::from(d[y * 1736 + x]);
+                n += 1.0;
+            }
+        }
+        s / n
+    };
+    let (g1, g2) = (mean(0, 0), mean(1, 1));
+    assert!((g1 - g2).abs() < 0.01 * g1, "greens {g1} vs {g2}");
+}
+
+/// Fujifilm RAF lens tables (`0xf00b` distortion, `0xf010` vignetting) become a warp and a vignette gain for the
+/// cameras whose geometry was checked against the camera JPEG (docs/fuji-lens-corrections.md). Reads `LIGHTCRAFT_FUJI` (a folder
+/// of RAFs or of per-model folders, e.g. the CC0 pixls set) or the corpus' `raf-fuji-*` files; skips when absent.
+#[test]
+fn fuji_embedded_lens_tables_follow_the_validated_models() {
+    fn collect(dir: &Path, depth: usize, out: &mut Vec<PathBuf>) {
+        let Ok(rd) = std::fs::read_dir(dir) else { return };
+        for e in rd.flatten() {
+            let p = e.path();
+            if p.is_dir() && depth < 2 {
+                collect(&p, depth + 1, out);
+            } else if p.extension().is_some_and(|x| x.eq_ignore_ascii_case("raf")) {
+                out.push(p);
+            }
+        }
+    }
+    let mut files = Vec::new();
+    match std::env::var_os("LIGHTCRAFT_FUJI") {
+        Some(dir) => collect(Path::new(&dir), 0, &mut files),
+        None => {
+            collect(&corpus_root().join("raw"), 1, &mut files);
+            files.retain(|p| p.file_name().is_some_and(|n| n.to_string_lossy().starts_with("raf-fuji-")));
+        }
+    }
+    files.sort();
+    // Bodies whose tables did not match the camera JPEG (or have no usable geometry sample): never corrected.
+    let unvalidated = ["FinePix F550EXR", "FinePix S1", "FinePix SL1000", "X10", "XF1", "XQ1"];
+    let (mut warped, mut vignetted, mut checked) = (0, 0, 0);
+    for path in &files {
+        let Ok(bytes) = std::fs::read(path) else { continue };
+        if lightcraft_raw::probe(&bytes) != Some(RawFormat::Raf) {
+            continue;
+        }
+        let name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+        let Ok(full) = decode(&bytes) else { continue };
+        assert_eq!(probe_info(&bytes).unwrap(), full.info(), "{name}: header and full decode agree");
+        let model = full.metadata.model.clone().unwrap_or_default();
+        let ops = &full.opcodes.list3;
+        if unvalidated.contains(&model.as_str()) {
+            assert!(ops.is_empty(), "{name} ({model}) is not a validated model");
+        }
+        for op in ops {
+            match op {
+                lightcraft_raw::Opcode::WarpRectilinear { planes, center } => {
+                    assert_eq!(*center, [0.5, 0.5], "{name}");
+                    assert_eq!(planes.len(), 1, "{name}: lateral CA is not applied");
+                    // a sane radial mapping: close to 1 at the centre, monotone, never folding
+                    let k = planes[0];
+                    assert!((0.85..1.15).contains(&k[0]), "{name}: {k:?}");
+                    let source = |r: f64| r * (k[0] + r * r * (k[1] + r * r * (k[2] + r * r * k[3])));
+                    assert!((0..100).all(|i| source((i + 1) as f64 / 100.0) > source(i as f64 / 100.0)), "{name}");
+                    warped += 1;
+                }
+                lightcraft_raw::Opcode::FixVignetteRadial { k, center } => {
+                    assert_eq!(*center, [0.5, 0.5], "{name}");
+                    let gain = 1.0 + k.iter().enumerate().map(|(i, c)| c * 1.0f64.powi(2 * i as i32 + 2)).sum::<f64>();
+                    assert!((1.0..3.0).contains(&gain), "{name}: corner gain {gain}");
+                    vignetted += 1;
+                }
+                other => panic!("{name}: unexpected opcode {other:?}"),
+            }
+        }
+        eprintln!(
+            "{model}: {} opcode(s) {}",
+            ops.len(),
+            if ops.iter().any(|o| matches!(o, lightcraft_raw::Opcode::WarpRectilinear { .. })) { "warp" } else { "no warp" }
+        );
+        checked += 1;
+    }
+    eprintln!("Fuji lens tables: {checked} RAFs, {warped} warps, {vignetted} vignette gains");
 }

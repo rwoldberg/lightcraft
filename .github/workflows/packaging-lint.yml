@@ -1,5 +1,7 @@
-# Quick static checks for the release pipeline (seconds, no Rust build): workflow syntax,
-# packaging shell/PowerShell scripts, and the Linux desktop/AppStream/Flatpak metadata.
+# Quick checks for the release pipeline (no Rust build): workflow syntax, packaging
+# shell/PowerShell scripts, and the Linux desktop/AppStream/Flatpak metadata (seconds), plus a
+# Windows job that builds and installs throwaway per-user MSI probes for the install-folder
+# searches (a few minutes).
 name: Packaging lint
 
 on:
@@ -23,7 +25,7 @@ jobs:
     env:
       ACTIONLINT_VERSION: 1.7.12
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install tools
         run: |
           sudo apt-get update
@@ -51,6 +53,11 @@ jobs:
           if grep -oE '<Icon Id="[^"]*"' packaging/windows/lightcraft.wxs | grep -vE '\.(ico|exe)"$'; then
             echo "::error::Icon Id must end in .ico or .exe"; exit 1
           fi
+          # The interactive installer asks where to install and ends on a completion page (issues #18, #399).
+          for want in '<UIRef Id="LightcraftUI" />' 'Value="InstallDirDlg"' '<Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />' \
+              'Key="Software\LightCraft" Name="InstallFolder"' 'Value="LaunchLightcraft"'; do
+            grep -qF "$want" packaging/windows/lightcraft.wxs || { echo "::error::lightcraft.wxs lost: $want"; exit 1; }
+          done
           desktop-file-validate packaging/linux/ai.storyteller.lightcraft.desktop
           sed -e 's/@VERSION@/0.0.0/' -e 's/@DATE@/2026-01-01/' packaging/linux/ai.storyteller.lightcraft.metainfo.xml.in >"$RUNNER_TEMP/ai.storyteller.lightcraft.metainfo.xml"
           appstreamcli validate --no-net --explain "$RUNNER_TEMP/ai.storyteller.lightcraft.metainfo.xml"
@@ -66,3 +73,17 @@ jobs:
           EOF
       - name: FreeBSD tarball layout (stub binaries)
         run: bash packaging/freebsd/package.sh --dry-run
+
+  windows-install-folder:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install WiX
+        shell: pwsh
+        run: dotnet tool install --global wix --version 5.0.2
+      - name: Install-folder fallback and precedence (real MSI AppSearch)
+        shell: pwsh
+        run: |
+          ./packaging/windows/test-install-folder.ps1 -Arch x64
+          ./packaging/windows/test-install-folder.ps1 -Arch x86

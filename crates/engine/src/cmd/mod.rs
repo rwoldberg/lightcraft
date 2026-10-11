@@ -4,6 +4,7 @@
 //! delete), `album.*`, `develop.*` (settings), `crop.*`, `mask.*`, `preset.*`, `version.*`,
 //! `edit.*` (undo/redo), and queries (`catalog.query`, `photo.inspect`, `develop.get`…).
 
+mod activity;
 mod before;
 pub(crate) mod browse;
 mod color;
@@ -18,6 +19,7 @@ pub(crate) mod face_detect;
 mod face_models;
 mod face_recognize;
 pub mod filters;
+pub mod geocode;
 pub mod keywords;
 pub mod library;
 pub mod lut_profiles;
@@ -31,6 +33,7 @@ mod prefs;
 mod preset_files;
 pub mod previews;
 mod query;
+mod sync;
 mod xmp;
 
 use serde::Serialize;
@@ -54,6 +57,10 @@ pub struct CommandSpec {
     pub run: Run,
     /// Record in the journal (false for queries).
     pub journal: bool,
+    /// `enabled` judges the selection (menus, shortcuts); a call that names its photos (`ids` /
+    /// `id`, see [`names_photos`]) skips it, and the command validates those photos itself.
+    /// Off unless a command opts in (`CommandSpec { explicit_targets: true, ..cmd!(…) }`).
+    pub explicit_targets: bool,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -94,6 +101,14 @@ pub fn has_active(s: &Session) -> std::result::Result<(), String> {
 pub fn has_selection(s: &Session) -> std::result::Result<(), String> {
     if s.selection.ids.is_empty() && s.selection.active.is_none() { Err("no photos selected".into()) } else { Ok(()) }
 }
+/// Albums hold library photos: a selection of only browsed (Local) photos has nothing an album
+/// can take (issue #684; Add to My Photos first).
+pub fn has_library_selection(s: &Session) -> std::result::Result<(), String> {
+    has_selection(s)?;
+    if s.targets(&serde_json::Value::Null).iter().any(|id| s.catalog.photo(*id).is_none_or(|p| !p.local)) { Ok(()) } else { Err(LOCAL_ONLY.into()) }
+}
+/// Why an album command refused a Local-only selection.
+pub const LOCAL_ONLY: &str = "only Local photos: albums hold library photos (Add to My Photos first)";
 pub fn can_undo(s: &Session) -> std::result::Result<(), String> {
     if s.undo.is_empty() { Err("nothing to undo".into()) } else { Ok(()) }
 }
@@ -107,10 +122,10 @@ pub fn has_clipboard(s: &Session) -> std::result::Result<(), String> {
 
 macro_rules! cmd {
     ($id:literal, $label:literal, [$($m:literal),*], $sc:expr, $params:literal, $en:expr, $run:expr) => {
-        $crate::cmd::CommandSpec { id: $id, label: $label, menu: &[$($m),*], shortcut: $sc, params: $params, enabled: $en, run: $run, journal: true }
+        $crate::cmd::CommandSpec { id: $id, label: $label, menu: &[$($m),*], shortcut: $sc, params: $params, enabled: $en, run: $run, journal: true, explicit_targets: false }
     };
     (query $id:literal, $label:literal, [$($m:literal),*], $sc:expr, $params:literal, $en:expr, $run:expr) => {
-        $crate::cmd::CommandSpec { id: $id, label: $label, menu: &[$($m),*], shortcut: $sc, params: $params, enabled: $en, run: $run, journal: false }
+        $crate::cmd::CommandSpec { id: $id, label: $label, menu: &[$($m),*], shortcut: $sc, params: $params, enabled: $en, run: $run, journal: false, explicit_targets: false }
     };
 }
 pub(crate) use cmd;
@@ -142,12 +157,15 @@ pub fn command_specs() -> &'static [CommandSpec] {
         v.extend(before::specs());
         v.extend(browse::specs());
         v.extend(missing::specs());
+        v.extend(sync::specs());
         v.extend(metadata::specs());
+        v.extend(geocode::specs());
         v.extend(filters::specs());
         v.extend(denoise::specs());
         v.extend(face_models::specs());
         v.extend(face_detect::specs());
         v.extend(face_recognize::specs());
+        v.extend(activity::specs());
         v
     })
 }
@@ -157,6 +175,11 @@ pub fn find_command(id: &str) -> Option<&'static CommandSpec> {
 }
 
 // ---------- param helpers
+
+/// The call names its target photos (`ids` or `id`, not null) instead of using the selection.
+pub(crate) fn names_photos(p: &Value) -> bool {
+    ["ids", "id"].iter().any(|k| p.get(k).is_some_and(|v| !v.is_null()))
+}
 
 pub(crate) fn bad(cmd: &str, msg: impl Into<String>) -> EngineError {
     EngineError::BadParams { cmd: cmd.into(), msg: msg.into() }

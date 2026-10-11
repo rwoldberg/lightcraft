@@ -14,7 +14,7 @@ fn active_dev(s: &Session) -> lightcraft_develop::DevelopSettings {
 fn changing_one_wb_control_resolves_as_shot_without_stale_tint() {
     use lightcraft_catalog::{Photo, PhotoId, Source};
     use lightcraft_develop::{DevelopSettings, WbMode};
-    for format in ["ARW", "NEF", "NRW", "RAF", "CR2", "PEF"] {
+    for format in ["ARW", "NEF", "NRW", "RAF", "CR2", "PEF", "ORF"] {
         let mut s = demo();
         let id = PhotoId(100);
         let name = format!("synthetic.{format}");
@@ -34,6 +34,33 @@ fn changing_one_wb_control_resolves_as_shot_without_stale_tint() {
         assert_eq!(active_dev(&s).wb.temp, 6500.0, "{format}");
         s.execute("develop.reset", &json!({})).unwrap();
         assert_eq!((active_dev(&s).wb.temp, active_dev(&s).wb.tint), (6500.0, 0.0), "{format}");
+    }
+}
+
+/// Reset Edits on a raw goes back to its import defaults, capture sharpening and colour noise
+/// reduction included (#763: reset left both at 0 while import sets 40 / 25); a rendered file
+/// keeps none.
+#[test]
+fn reset_edits_restores_a_raws_import_defaults() {
+    use lightcraft_catalog::{Photo, PhotoId, Source};
+    use lightcraft_develop::DevelopSettings;
+    let mut s = demo();
+    for (id, format, raw) in [(200u64, "NEF", true), (201, "JPG", false)] {
+        let name = format!("p{id}.{format}");
+        let mut p = Photo::new(PhotoId(id), Source::File { path: name.clone() }, &name, format, 16, 16, "");
+        if raw {
+            p.as_shot_wb = Some((5200.0, 4.0));
+            p.develop = std::sync::Arc::new(DevelopSettings::for_raw(5200.0, 4.0));
+        }
+        s.catalog.apply(lightcraft_catalog::Op::AddPhoto { photo: Box::new(p) }).unwrap();
+    }
+    for (id, want) in [(200, (40.0, 25.0)), (201, (0.0, 0.0))] {
+        s.execute("library.select", &json!({"ids": [id], "active": id})).unwrap();
+        s.execute("develop.set", &json!({"control": "detail.sharpenAmount", "value": 90})).unwrap();
+        s.execute("develop.set", &json!({"control": "detail.nrColor", "value": 70})).unwrap();
+        s.execute("develop.reset", &json!({})).unwrap();
+        let d = active_dev(&s);
+        assert_eq!((d.detail.sharpen_amount, d.detail.nr_color), want, "photo {id}");
     }
 }
 
@@ -113,9 +140,10 @@ fn albums_crud() {
     s.execute("library.selectAll", &json!({})).unwrap();
     s.execute("album.addPhotos", &json!({"id": a})).unwrap();
     assert_eq!(s.catalog.album(lightcraft_catalog::AlbumId(a)).unwrap().photos.len(), 24);
-    assert!(s.execute("album.delete", &json!({"id": f})).is_err(), "non-empty folder");
-    s.execute("album.delete", &json!({"id": a})).unwrap();
     s.execute("album.delete", &json!({"id": f})).unwrap();
+    assert!(s.catalog.album(lightcraft_catalog::AlbumId(a)).is_none());
+    assert!(s.catalog.album(lightcraft_catalog::AlbumId(f)).is_none());
+    assert_eq!(s.catalog.photos().count(), 24, "album deletion keeps the photos");
 }
 
 /// Given an album and a folder, when something is created inside each, then only the folder
@@ -196,6 +224,60 @@ fn deleting_explicit_targets_keeps_the_surviving_selection() {
     assert_eq!(s.selection, before, "deleting an unselected photo doesn't change selection");
     s.execute("photo.delete", &json!({"ids": [visible[9]]})).unwrap();
     assert_eq!(s.selection, Selection::single(visible[8]), "partial deletion retains a selected survivor");
+}
+
+#[test]
+fn permanently_deleting_photos_selects_a_neighbour_in_recently_deleted() {
+    for params in [json!({}), json!({"key": "fileName", "ascending": false}), json!({"key": "random", "seed": 123})] {
+        for at_end in [false, true] {
+            let mut s = demo();
+            s.execute("library.selectAll", &json!({})).unwrap();
+            s.execute("photo.delete", &json!({})).unwrap();
+            s.execute("library.source", &json!({"kind": "recentlyDeleted"})).unwrap();
+            s.execute("library.sort", &params).unwrap();
+            s.execute("library.filter", &json!({"rating": 2})).unwrap();
+            let visible = s.visible_cloned();
+            assert!(visible.len() > 5);
+            let at = if at_end { visible.len() - 2 } else { visible.len() / 2 };
+            let deleted = &visible[at..at + 2];
+            s.execute("library.select", &json!({"ids": deleted, "active": deleted[0]})).unwrap();
+            let snapshot = s.catalog.to_snapshot();
+            let undo_len = s.undo.len();
+            let r = s.execute("photo.deletePermanently", &json!({})).unwrap();
+            assert_eq!(r["deleted"], 2);
+            let expected = if at_end { visible[at - 1] } else { visible[at + 2] };
+            assert_eq!(s.selection, Selection::single(expected), "sort {params}, end {at_end}");
+            assert!(deleted.iter().all(|id| s.catalog.photo(*id).is_none()));
+            assert_eq!(s.undo.len(), undo_len + 1);
+            let removed = s.catalog.to_snapshot();
+            s.execute("edit.undo", &json!({})).unwrap();
+            assert_eq!(s.catalog.to_snapshot(), snapshot);
+            s.execute("edit.redo", &json!({})).unwrap();
+            assert_eq!(s.catalog.to_snapshot(), removed);
+        }
+    }
+    let mut s = demo();
+    s.execute("library.selectAll", &json!({})).unwrap();
+    s.execute("photo.deletePermanently", &json!({})).unwrap();
+    assert!(s.visible().is_empty());
+    assert_eq!(s.selection, Selection::default());
+}
+
+#[test]
+fn permanently_deleting_explicit_targets_keeps_the_surviving_selection() {
+    let mut s = demo();
+    let visible = s.visible_cloned();
+    s.execute("library.select", &json!({"ids": [visible[8], visible[9]], "active": visible[9]})).unwrap();
+    let before = s.selection.clone();
+    s.execute("photo.deletePermanently", &json!({"ids": [visible[3]]})).unwrap();
+    assert_eq!(s.selection, before, "deleting an unselected photo doesn't change selection");
+    s.execute("photo.deletePermanently", &json!({"ids": [visible[9]]})).unwrap();
+    assert_eq!(s.selection, Selection::single(visible[8]), "partial deletion retains a selected survivor");
+    let before = s.selection.clone();
+    let snapshot = s.catalog.to_snapshot();
+    assert!(s.execute("photo.deletePermanently", &json!({"ids": [999_999]})).is_err());
+    assert_eq!(s.selection, before, "a refused deletion doesn't change selection");
+    assert_eq!(s.catalog.to_snapshot(), snapshot);
 }
 
 #[test]
@@ -475,6 +557,36 @@ fn crop_drag_keeps_a_locked_ratio_on_every_handle() {
     }
 }
 
+// Feature: Shift while dragging keeps the current proportions (issue 614)
+#[test]
+fn crop_drag_keep_ratio_holds_the_shape_with_the_lock_off() {
+    let mut s = demo();
+    s.execute("crop.set", &json!({"rect": [0.1, 0.2, 0.7, 0.6]})).unwrap();
+    assert!(active_dev(&s).crop.aspect.is_none(), "lock is off");
+    let r = active_dev(&s).crop.geometry.rect;
+    let want = r.aspect();
+    for (handle, to) in [("left", [r.x0 + 0.1, 0.5]), ("top", [0.5, r.y0 + 0.05]), ("bottomRight", [1.3, 1.3]), ("right", [0.9, 0.5])] {
+        s.execute("crop.drag", &json!({"handle": handle, "from": [0.5, 0.5], "to": to, "start": [r.x0, r.y0, r.x1, r.y1], "keepRatio": true}))
+            .unwrap();
+        let g = active_dev(&s).crop.geometry.rect;
+        assert!((g.aspect() - want).abs() < 1e-6, "{handle}: {} vs {want}", g.aspect());
+        assert!(active_dev(&s).crop.aspect.is_none(), "the lock toggle is untouched");
+    }
+}
+
+#[test]
+fn crop_drag_without_keep_ratio_and_lock_off_is_free() {
+    let mut s = demo();
+    s.execute("crop.set", &json!({"rect": [0.1, 0.2, 0.7, 0.6]})).unwrap();
+    let r = active_dev(&s).crop.geometry.rect;
+    let want = r.aspect();
+    s.execute("crop.drag", &json!({"handle": "right", "from": [0.7, 0.4], "to": [0.9, 0.4], "start": [r.x0, r.y0, r.x1, r.y1]})).unwrap();
+    assert!((active_dev(&s).crop.geometry.rect.aspect() - want).abs() > 1e-3, "ratio changes freely");
+    s.execute("crop.drag", &json!({"handle": "right", "from": [0.7, 0.4], "to": [0.9, 0.4], "start": [r.x0, r.y0, r.x1, r.y1], "keepRatio": false}))
+        .unwrap();
+    assert!((active_dev(&s).crop.geometry.rect.aspect() - want).abs() > 1e-3, "keepRatio false is the same");
+}
+
 #[test]
 fn crop_drag_rejects_unknown_handles_and_bad_points() {
     let mut s = demo();
@@ -664,6 +776,42 @@ fn build_previews_fills_the_cache() {
         std::thread::sleep(std::time::Duration::from_millis(20));
     }
     assert!(s.execute("library.buildPreviews", &json!({"size": "huge"})).is_err());
+}
+
+/// Wait (at most a minute) until no background task is listed.
+fn wait_activity_empty(s: &Session) {
+    let t0 = std::time::Instant::now();
+    while !s.activity.list().is_empty() {
+        assert!(t0.elapsed().as_secs() < 60, "tasks still listed: {:?}", s.activity.list());
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+}
+
+/// Issue #345: a background preview build is a row in the activity stack while it runs.
+#[test]
+fn preview_build_shows_in_activity_until_it_finishes() {
+    let mut s = demo();
+    let ids: Vec<u64> = s.catalog.photos().take(4).map(|p| p.id.0).collect();
+    let r = s.execute("library.buildPreviews", &json!({"ids": ids, "size": "standard", "edge": 256})).unwrap();
+    let tasks = s.activity.list();
+    assert_eq!(tasks.first().map(|t| (t.kind, t.total, t.label.as_str())), Some(("previews", 4, "Building previews")), "{tasks:?} {r}");
+    assert!(tasks[0].cancellable);
+    wait_activity_empty(&s);
+    assert_eq!(s.execute("library.previewProgress", &json!({})).unwrap()["running"], false);
+}
+
+/// Issue #345: `activity.cancel` stops a preview build like `library.cancelPreviews`.
+#[test]
+fn activity_cancel_stops_a_preview_build() {
+    let mut s = demo();
+    let ids: Vec<u64> = s.catalog.photos().map(|p| p.id.0).collect();
+    s.execute("library.buildPreviews", &json!({"ids": ids, "size": "full"})).unwrap();
+    let id = s.activity.list().first().map(|t| t.id).expect("a previews row");
+    s.execute("activity.cancel", &json!({"id": id})).unwrap();
+    wait_activity_empty(&s);
+    let p = s.execute("library.previewProgress", &json!({})).unwrap();
+    assert_eq!(p["cancelled"], true, "{p}");
+    assert!(p["done"].as_u64() < p["total"].as_u64(), "stopped part-way: {p}");
 }
 
 /// Colour range: a click samples the colour under it, so the mask selects that colour (white
@@ -1014,4 +1162,19 @@ fn undo_and_redo_show_the_photo_they_change() {
     let before = s.selection.clone();
     s.execute("edit.undo", &json!({})).unwrap();
     assert_eq!(s.selection, before, "a step over several photos keeps the selection");
+}
+
+#[test]
+fn hdr_edits_render_with_their_hdr_histogram() {
+    let mut s = demo();
+    let id = s.active().unwrap();
+    let plain = s.loupe_job(id, 200, 200, true).unwrap().run().rendered.unwrap();
+    assert!(plain.histogram.hdr.is_none(), "SDR edits: the image's histogram");
+    s.execute("develop.hdr", &json!({"enabled": true, "maxEv": 3})).unwrap();
+    s.execute("develop.set", &json!({"control": "light.exposure", "value": 1.0})).unwrap();
+    let r = s.loupe_job(id, 200, 200, true).unwrap().run().rendered.unwrap();
+    let bins = r.histogram.hdr.expect("an HDR edit's histogram");
+    assert_eq!(bins.stops, lightcraft_develop::Hdr::MAX_EV_LIMIT as f32, "a fixed scale");
+    assert!(r.histogram.above_sdr() > 0.0);
+    assert!(r.deep.is_none(), "the preview itself stays the 8-bit SDR rendition");
 }

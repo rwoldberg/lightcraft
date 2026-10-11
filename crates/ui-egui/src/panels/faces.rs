@@ -205,15 +205,25 @@ pub fn settings_tab(app: &mut LightcraftApp, ui: &mut egui::Ui, t: &Tokens) {
         return;
     }
     let mut on = list["enabled"].as_bool().unwrap_or(false);
-    if check(ui, "settings.facesEnabled", &mut on, "Recognise faces (experimental)") {
-        let _ = app.run("faces.enable", json!({"enabled": on}));
-        app.caches.faces_epoch += 1;
+    let runtime = list["runtime"].as_bool() == Some(true);
+    // a chosen recognition model that is installed: without one the switch has nothing to run
+    // (issue #678), so it can only be switched off, with the hint below saying what to do first
+    let usable =
+        list["embedder"].as_str().is_some_and(|id| list["models"].as_array().into_iter().flatten().any(|m| m["id"] == id && m["installed"] == true));
+    let r = ui
+        .add_enabled(on || (runtime && usable), egui::Checkbox::new(&mut on, crate::i18n::tr("Recognise faces (experimental)")))
+        .on_disabled_hover_text(crate::i18n::tr("Choose a model below (Use) to start."));
+    register(ui.ctx(), "check:settings.facesEnabled", r.rect);
+    if r.changed() {
+        match app.run("faces.enable", json!({"enabled": on})) {
+            Ok(_) => app.caches.faces_epoch += 1,
+            Err(e) => app.toast(ui.ctx(), e),
+        }
     }
     hint(ui, t, "Suggests who is in a photo from the faces you have named. Everything stays on your computer.");
-    let runtime = list["runtime"].as_bool() == Some(true);
     if !runtime {
         hint(ui, t, "This build cannot run recognition models: they can be added and chosen, not used.");
-    } else if on && list["embedder"].is_null() {
+    } else if !usable {
         hint(ui, t, "Choose a model below (Use) to start.");
     } else if on && app.caches.faces_active {
         scan_progress(app, ui, t);
@@ -669,8 +679,9 @@ pub fn pump(app: &mut LightcraftApp, ctx: &egui::Context) {
     app.caches.faces_active = v["active"] == true;
     app.caches.faces_indexed = v["indexedFaces"].as_u64().unwrap_or(0);
     app.caches.faces_pending = v["pendingPhotos"].as_u64().unwrap_or(0);
-    // the progress bar's whole: the most photos that were left at once since the scan last finished
-    app.caches.faces_peak = if app.caches.faces_pending == 0 { 0 } else { app.caches.faces_peak.max(app.caches.faces_pending) };
+    // the progress bar's whole: the most photos that were left at once since the scan last finished (the engine keeps
+    // it, so Settings and the activity stack agree)
+    app.caches.faces_peak = v["peak"].as_u64().unwrap_or(0);
     // Frames are drawn only when something asks for one, so nothing here wakes the window needlessly: while there is work it
     // asks to be called again in 50 ms (the progress in Settings, the next photos for the workers); with recognition on and
     // nothing to do it looks again every few seconds (a few wake-ups a minute); with recognition off it asks for nothing

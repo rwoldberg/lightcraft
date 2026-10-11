@@ -104,6 +104,9 @@ pub struct SidecarData {
     /// `xmp:CreateDate` (first found). Used only when the file itself has no capture time.
     pub captured: Option<String>,
     pub develop: Option<DevelopPatch>,
+    /// Actionable diagnostics for foreign develop settings that were not fully carried over.
+    /// These are surfaced in the photo import report and never persisted in the catalog.
+    pub warnings: Vec<crate::import::ImportWarning>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -114,8 +117,10 @@ pub enum DevelopPatch {
     Partial(Value),
 }
 
-/// Parse a sidecar / XMP packet. `raw` selects absolute (raw) vs relative white balance for `crs:`.
-pub fn parse_sidecar(xmp: &str, raw: bool) -> std::result::Result<SidecarData, String> {
+/// Parse a sidecar / XMP packet. `target` selects how a `crs:` white balance is read
+/// ([`crate::crs::Target`]: absolute Kelvin for raws with a measured illuminant, a shift from the
+/// as-shot white for everything developed relative to it).
+pub fn parse_sidecar(xmp: &str, target: crate::crs::Target) -> std::result::Result<SidecarData, String> {
     let d = lightcraft_meta::parse_xmp(xmp).map_err(|e| e.to_string())?;
     let m = &d.metadata;
     let lc = |k: &str| d.properties.get(&format!("lc:{k}")).and_then(|v| v.first()).cloned();
@@ -133,7 +138,8 @@ pub fn parse_sidecar(xmp: &str, raw: bool) -> std::result::Result<SidecarData, S
         country: m.country.clone(),
         alt_text: m.alt_text.clone(),
         extended_description: m.extended_description.clone(),
-        keywords: (!m.keywords.is_empty()).then(|| m.keywords.clone()),
+        keywords: (!m.keywords.is_empty() || !m.hierarchical_keywords.is_empty())
+            .then(|| lightcraft_catalog::keywords::from_file(&m.keywords, &m.hierarchical_keywords)),
         // A sidecar that has `mwg-rs:Regions` at all (even an empty list) was written by an app that
         // knows about regions, so it's authoritative: its list, empty or not, replaces the catalog's.
         // One without it (most writers, LightCraft's own included, which keeps another app's
@@ -162,7 +168,65 @@ pub fn parse_sidecar(xmp: &str, raw: bool) -> std::result::Result<SidecarData, S
     out.develop = match full {
         Some(s) => Some(DevelopPatch::Full(Box::new(s))),
         None if crate::crs::has_adjustments(&d.properties) => {
-            Some(DevelopPatch::Partial(crate::crs::to_partial_report(&d.properties, Some(&d.values), Some(raw), crate::crs_masks::DEFAULT_ASPECT).0))
+            let (partial, unmapped) = crate::crs::to_partial_report(&d.properties, Some(&d.values), target, crate::crs_masks::DEFAULT_ASPECT);
+            // Lightroom's default profiles are named by nearly every sidecar; our own starting look stands
+            // in for them, so only another profile is worth a warning
+            let profile = crate::crs::camera_profile_name(&d.properties)
+                .filter(|name| !matches!(name.trim(), "Adobe Standard" | "Adobe Color"))
+                .map(str::to_string);
+            if let Some(name) = profile {
+                out.warnings.push(crate::import::ImportWarning {
+                    path: String::new(),
+                    code: crate::import::ImportWarningCode::CameraProfile,
+                    profile: Some(name),
+                    mode: None,
+                    fields: Vec::new(),
+                });
+            }
+            let upright = crate::crs::has_saved_upright_transform(&d.properties);
+            if upright {
+                let mode = d
+                    .properties
+                    .get("crs:PerspectiveUpright")
+                    .and_then(|values| values.first())
+                    .map(String::as_str)
+                    .map(|mode| match mode {
+                        "0" => crate::import::ImportUprightMode::Off,
+                        "1" => crate::import::ImportUprightMode::Auto,
+                        "2" => crate::import::ImportUprightMode::Level,
+                        "3" => crate::import::ImportUprightMode::Vertical,
+                        "4" => crate::import::ImportUprightMode::Full,
+                        "5" => crate::import::ImportUprightMode::Guided,
+                        _ => crate::import::ImportUprightMode::Unknown,
+                    })
+                    .unwrap_or(crate::import::ImportUprightMode::Unknown);
+                out.warnings.push(crate::import::ImportWarning {
+                    path: String::new(),
+                    code: crate::import::ImportWarningCode::UprightGeometry,
+                    profile: None,
+                    mode: Some(mode),
+                    fields: Vec::new(),
+                });
+            }
+            let other: Vec<&str> = unmapped
+                .iter()
+                .map(String::as_str)
+                .filter(|name| {
+                    *name != "CameraProfile"
+                        && !name.starts_with("UprightTransform_")
+                        && !matches!(*name, "UprightTransformCount" | "UprightCenterNormX" | "UprightCenterNormY" | "UprightVersion")
+                })
+                .collect();
+            if !other.is_empty() {
+                out.warnings.push(crate::import::ImportWarning {
+                    path: String::new(),
+                    code: crate::import::ImportWarningCode::UnmappedXmp,
+                    profile: None,
+                    mode: None,
+                    fields: other.into_iter().map(str::to_string).collect(),
+                });
+            }
+            Some(DevelopPatch::Partial(partial))
         }
         None => None,
     };
@@ -245,6 +309,12 @@ impl SidecarData {
 /// The sidecar packet for a photo; the colour label is written by its name in `cat` (custom
 /// label names included, as other editors do).
 pub fn sidecar_packet(p: &Photo, cat: &lightcraft_catalog::Catalog) -> String {
+    sidecar_packet_with(p, cat, false)
+}
+
+/// [`sidecar_packet`], without any location (GPS, sublocation, city, state, country) when
+/// `remove_location` is set (an export with "Remove location info").
+pub fn sidecar_packet_with(p: &Photo, cat: &lightcraft_catalog::Catalog, remove_location: bool) -> String {
     let nz = |s: &str| (!s.trim().is_empty()).then(|| s.to_string());
     let meta = lightcraft_meta::Metadata {
         software: Some("LightCraft".into()),
@@ -268,6 +338,10 @@ pub fn sidecar_packet(p: &Photo, cat: &lightcraft_catalog::Catalog) -> String {
         gps: p.meta.gps.map(|(latitude, longitude)| lightcraft_meta::Gps { latitude, longitude, altitude: None }),
         ..Default::default()
     };
+    let mut meta = meta;
+    if remove_location {
+        (meta.sublocation, meta.city, meta.state, meta.country, meta.gps) = (None, None, None, None, None);
+    }
     let settings = serde_json::to_string(&*p.develop).unwrap_or_default();
     let flag = match p.flag {
         Flag::None => "none",
@@ -275,7 +349,7 @@ pub fn sidecar_packet(p: &Photo, cat: &lightcraft_catalog::Catalog) -> String {
         Flag::Reject => "reject",
     };
     let mut lc = vec![("settings", settings.as_str()), ("flag", flag)];
-    if !p.meta.location.trim().is_empty() {
+    if !remove_location && !p.meta.location.trim().is_empty() {
         lc.push(("location", p.meta.location.as_str()));
     }
     lightcraft_meta::write_xmp_lc(&meta, &lc)
@@ -445,6 +519,18 @@ impl Session {
     /// catalogued file shares the stem (`IMG_0001.CR3` + `IMG_0001.JPG`) and owns the stem
     /// sidecar — a raw first, else the first by file name. The others use Full naming
     /// (`IMG_0001.JPG.xmp`), so their metadata never overwrites each other.
+    /// [`Session::sidecar_naming`] for many photos, the catalog's sidecar owners worked out once
+    /// (per photo that is a pass over the whole catalog).
+    pub fn sidecar_namings(&self, ids: &[PhotoId]) -> Vec<SidecarNaming> {
+        let owners = (self.xmp.naming == SidecarNaming::Stem).then(|| StemOwners::of(&self.catalog));
+        ids.iter()
+            .map(|id| match (self.catalog.photo(*id), &owners) {
+                (Some(p), Some(o)) => o.naming(p, self.xmp.naming),
+                _ => self.xmp.naming,
+            })
+            .collect()
+    }
+
     pub fn sidecar_naming(&self, id: PhotoId) -> SidecarNaming {
         match self.catalog.photo(id) {
             Some(p) if self.xmp.naming == SidecarNaming::Stem => StemOwners::of(&self.catalog).naming(p, self.xmp.naming),
@@ -453,31 +539,67 @@ impl Session {
     }
 
     /// Write the photo's XMP sidecar, merged into an existing one (see the module docs).
-    pub fn save_sidecar(&self, id: PhotoId) -> Result<SidecarSaved> {
+    pub fn save_sidecar(&mut self, id: PhotoId) -> Result<SidecarSaved> {
         self.save_sidecar_with(id, &StemOwners::of(&self.catalog))
     }
 
-    pub(crate) fn save_sidecar_with(&self, id: PhotoId, owners: &StemOwners) -> Result<SidecarSaved> {
+    pub(crate) fn save_sidecar_with(&mut self, id: PhotoId, owners: &StemOwners) -> Result<SidecarSaved> {
         let p = self.catalog.photo(id).ok_or(lightcraft_catalog::CatalogError::NoPhoto(id))?;
         if p.copy_of.is_some() {
             return Err(EngineError::Other(format!("{} is a virtual copy: its settings live only in the library", p.file_name)));
         }
         let orig = file_path(p).ok_or_else(|| EngineError::Other(format!("{} is not a file on disk", p.file_name)))?;
-        let path = sidecar_path(orig, owners.naming(p, self.xmp.naming));
+        let naming = owners.naming(p, self.xmp.naming);
+        let preferred = sidecar_path(orig, naming);
+        let other = if naming == SidecarNaming::Stem { SidecarNaming::Full } else { SidecarNaming::Stem };
+        let candidates: Vec<PathBuf> = [naming, other]
+            .into_iter()
+            .filter(|n| *n != SidecarNaming::Stem || owners.naming(p, SidecarNaming::Stem) == SidecarNaming::Stem)
+            .flat_map(|n| {
+                let path = sidecar_path(orig, n);
+                [path.clone(), path.with_extension("XMP")]
+            })
+            .collect();
+        // A separated packet is still the photo's metadata. Repair it before a fresh write
+        // occupies its destination; a failure preserves the queue and both existing packets.
+        self.repair_sidecars_for_paths(&candidates, &crate::rename::RealFs)
+            .map_err(|e| EngineError::Other(format!("{}: unfinished XMP repair: {e}", preferred.display())))?;
+        // Keep an existing packet's spelling/style so foreign properties survive this save and
+        // subsequent Undo/Redo writes. Shared stems owned by another photo were excluded above.
+        let path = candidates.into_iter().find(|path| path.is_file()).unwrap_or(preferred);
+        self.validate_sidecar_packets_for_paths(std::slice::from_ref(&path), &crate::rename::RealFs)?;
+        let p = self.catalog.photo(id).ok_or(lightcraft_catalog::CatalogError::NoPhoto(id))?;
         let err = |e: std::io::Error| EngineError::Other(format!("{}: {e}", path.display()));
         let (data, merged, backup) = sidecar_contents(&path, sidecar_packet(p, &self.catalog), &(self.clock)()).map_err(err)?;
         write_atomic(&path, data.as_bytes()).map_err(err)?;
+        self.note_sidecar_write(&path, data.as_bytes());
         Ok(SidecarSaved { path, merged, backup })
     }
 
     /// The op that applies a photo's sidecar (or embedded XMP) to the catalog, if there is one.
     pub fn read_sidecar_op(&self, id: PhotoId) -> Result<Option<(Op, PathBuf)>> {
+        self.read_sidecar_op_with_warnings(id).map(|result| result.map(|(op, from, _)| (op, from)))
+    }
+
+    /// Like [`Session::read_sidecar_op`], retaining transient diagnostics for the command report.
+    pub fn read_sidecar_op_with_warnings(&self, id: PhotoId) -> Result<Option<(Op, PathBuf, Vec<crate::import::ImportWarning>)>> {
         let p = self.catalog.photo(id).ok_or(lightcraft_catalog::CatalogError::NoPhoto(id))?;
         let Some(orig) = file_path(p) else { return Ok(None) };
         let Some((packet, from)) = read_packet(orig, p.kind, self.sidecar_naming(id)) else { return Ok(None) };
-        let sc = parse_sidecar(&packet, p.kind == MediaKind::Raw)
-            .map_err(|e| EngineError::Other(format!("{}: {e}", from.display())))?
-            .resolve_label(&self.catalog);
+        let sc = parse_sidecar(&packet, crate::crs::Target::for_photo(p)).map_err(|e| EngineError::Other(format!("{}: {e}", from.display())))?;
+        let mut warnings = sc.warnings.clone();
+        for warning in &mut warnings {
+            warning.path = orig.to_string();
+        }
+        let op = self.sidecar_op(id, sc)?;
+        Ok(Some((op, from, warnings)))
+    }
+
+    /// The op that applies what a sidecar says (already read and parsed, e.g. on a worker
+    /// thread) to photo `id`: the sidecar wins. No file is read.
+    pub fn sidecar_op(&self, id: PhotoId, sc: SidecarData) -> Result<Op> {
+        let p = self.catalog.photo(id).ok_or(lightcraft_catalog::CatalogError::NoPhoto(id))?;
+        let sc = sc.resolve_label(&self.catalog);
         let mut q = (**p).clone();
         let develop_changed = merge_into(&mut q, &sc, &(self.clock)());
         let mut ops = vec![
@@ -492,13 +614,26 @@ impl Session {
         if develop_changed {
             ops.extend(self.develop_op(id, (*q.develop).clone(), "Read Metadata from File"));
         }
-        Ok(Some((Op::Batch { ops }, from)))
+        Ok(Op::Batch { ops })
     }
 
     /// Auto-write: sidecars for photos changed by `ops` (errors are logged, not returned).
-    pub(crate) fn auto_write_sidecars(&self, ops: &[Op]) {
+    pub(crate) fn auto_write_sidecars(&mut self, ops: &[Op]) {
         let mut ids = Vec::new();
         ops.iter().for_each(|o| op_photos(o, &mut ids));
+        self.auto_write_sidecar_ids(ids);
+    }
+
+    /// Gather changed IDs before the saves mutate retained physical repair queues.
+    pub(crate) fn auto_write_sidecars_since(&mut self, log_start: usize) {
+        let mut ids = Vec::new();
+        if let Some(ops) = self.pending_log.get(log_start..) {
+            ops.iter().for_each(|o| op_photos(o, &mut ids));
+        }
+        self.auto_write_sidecar_ids(ids);
+    }
+
+    fn auto_write_sidecar_ids(&mut self, ids: Vec<PhotoId>) {
         if ids.is_empty() {
             return;
         }
@@ -515,6 +650,19 @@ impl Session {
 
 #[cfg(test)]
 mod tests {
+    /// A sidecar written by Lightroom Classic (names flat, paths in `lr:hierarchicalSubject`)
+    /// gives the photo its keywords as paths.
+    #[test]
+    fn sidecar_keywords_keep_their_hierarchy() {
+        let m = lightcraft_meta::Metadata {
+            keywords: vec!["Lisbon".into(), "Places".into()],
+            hierarchical_keywords: vec!["Places|Lisbon".into()],
+            ..Default::default()
+        };
+        let sc = super::parse_sidecar(&lightcraft_meta::write_xmp(&m, None), crate::crs::Target::Rendered).unwrap();
+        assert_eq!(sc.keywords, Some(vec!["Places|Lisbon".to_string()]));
+    }
+
     use super::*;
     use lightcraft_catalog::Meta;
 
@@ -553,7 +701,7 @@ mod tests {
     fn packet_roundtrip_restores_everything() {
         let p = photo();
         let x = sidecar_packet(&p, &lightcraft_catalog::Catalog::new());
-        let sc = parse_sidecar(&x, false).unwrap();
+        let sc = parse_sidecar(&x, crate::crs::Target::Rendered).unwrap();
         assert_eq!(sc.rating, Some(4));
         assert_eq!(sc.flag, Some(Flag::Pick));
         assert_eq!(sc.label, Some(Some(ColorLabel::Purple)));
@@ -572,7 +720,7 @@ mod tests {
         let x = r#"<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
           <rdf:Description rdf:about="" xmlns:xmp="http://ns.adobe.com/xap/1.0/" xmlns:crs="http://ns.adobe.com/camera-raw-settings/1.0/"
             xmp:Rating="-1" xmp:Label="Green" crs:Exposure2012="-0.40" crs:Vibrance="+12"/></rdf:RDF></x:xmpmeta>"#;
-        let sc = parse_sidecar(x, true).unwrap();
+        let sc = parse_sidecar(x, crate::crs::Target::RawAbsolute).unwrap();
         assert_eq!((sc.rating, sc.flag, sc.label), (Some(0), Some(Flag::Reject), Some(Some(ColorLabel::Green))));
         let mut p = photo();
         let before = p.develop.clone();
@@ -599,3 +747,15 @@ mod tests {
         assert_eq!(v, vec![PhotoId(1), PhotoId(3)]);
     }
 }
+
+#[cfg(test)]
+#[path = "sidecar/tests_repair_saves.rs"]
+mod tests_repair_saves;
+
+#[cfg(test)]
+#[path = "sidecar/tests_repair_companions.rs"]
+mod tests_repair_companions;
+
+#[cfg(test)]
+#[path = "sidecar/tests_repair_provenance.rs"]
+mod tests_repair_provenance;

@@ -444,12 +444,22 @@ fn group_header(app: &mut LightcraftApp, ui: &mut egui::Ui, run: &DateRun, ids: 
 }
 
 /// Request a grid/filmstrip thumbnail at `priority`. An unedited raw without a thumbnail texture
-/// first gets a stand-in (its cached thumbnail, else its embedded camera preview), and its real
-/// render then follows in the background.
+/// gets its embedded camera preview, and the render of the raw behind it follows in the background
+/// — except where that render would only redraw what the embedded JPEG already shows (see
+/// [`lightcraft_engine::media::Session::embedded_thumb_is_final`]), which for a folder of raws on a
+/// network share is the difference between reading every file whole and reading a preview each.
 pub fn request_thumb(app: &mut LightcraftApp, id: PhotoId, size: usize, priority: u32) {
     let bucket = lightcraft_engine::media::thumb_bucket(size);
     if let Some(photo) = app.session.catalog.photo(id)
         && app.renderer.thumb_current(photo, bucket, priority)
+    {
+        return;
+    }
+    // The camera's embedded preview is this photo's thumbnail (unedited raw): once its quick render
+    // has arrived there is nothing left to ask for. Without this the grid would rebuild the render
+    // job — and its cache key — on every frame, which is what the embedded-thumbnail record settles.
+    if let Some(photo) = app.session.catalog.photo(id)
+        && (app.renderer.thumb_quick_is_final(photo, bucket, priority) || app.renderer.thumb_quick_pending(photo, bucket))
     {
         return;
     }
@@ -459,18 +469,39 @@ pub fn request_thumb(app: &mut LightcraftApp, id: PhotoId, size: usize, priority
         app.renderer.thumb_jobs_built += 1;
     }
     let quick = if app.renderer.textures.contains_key(&Slot::Thumb(id)) { None } else { app.session.quick_thumb_job(&job) };
+    // A cached render is a stand-in for whatever comes next; an embedded camera preview of an
+    // unedited raw is the picture itself, so no sensor decode is scheduled behind it.
+    let embedded_is_final =
+        quick.is_some() && app.session.catalog.photo(id).is_some_and(|p| skips_the_real_render(app.session.embedded_thumb_is_final(p), true));
     if let Some(photo) = app.session.catalog.photo(id) {
-        app.renderer.remember_thumb(photo, bucket, job.key, quick.is_some());
+        if embedded_is_final {
+            app.renderer.remember_embedded_thumb(photo, bucket, job.key);
+        } else {
+            app.renderer.remember_thumb(photo, bucket, job.key, quick.is_some());
+        }
     }
     match quick {
         Some(q) => {
             app.renderer.request_quick(Slot::ThumbQuick(id), q, priority + 1);
-            if !app.renderer.is_pending(Slot::ThumbQuick(id)) {
+            if !embedded_is_final && !app.renderer.is_pending(Slot::ThumbQuick(id)) {
                 app.renderer.request(Slot::Thumb(id), job, BACKGROUND_THUMB_PRIORITY);
             }
         }
         None => app.renderer.request(Slot::Thumb(id), job, priority),
     }
+}
+
+/// Whether a photo's grid thumbnail is already the picture it should show, so the render of the raw
+/// behind it is skipped. `embedded_is_final` is the engine's answer
+/// ([`lightcraft_engine::media::Session::embedded_thumb_is_final`]: the photo is an unedited raw
+/// whose camera JPEG the viewer is showing) and `from_embedded` says the stand-in actually came from
+/// the embedded preview rather than a cached render of the file.
+///
+/// Skipping matters where the file is expensive to read: decoding a 56 MB Fuji RAF to draw a 512 px
+/// thumbnail — which the 4 416 × 2 944 embedded JPEG already covers — cost 45 s a photo over a
+/// 1.2 MB/s share, and the queue it built delayed the render the user was waiting for.
+pub(crate) fn skips_the_real_render(embedded_is_final: bool, from_embedded: bool) -> bool {
+    embedded_is_final && from_embedded
 }
 
 /// Rendered thumbnails replacing embedded previews: after everything on screen.
@@ -730,10 +761,33 @@ fn folder_header(app: &mut LightcraftApp, ui: &mut egui::Ui, b: &lightcraft_engi
     header.response.rect
 }
 
+/// The folders a breadcrumb shows for `path`: each name with the path that opens it, spelled as
+/// in `path` (its separators, a leading `/` or a UNC `\\server\share`; issue #538). A bare drive
+/// (`C:`) gets its separator back: on its own it means the current folder on that drive.
+pub(crate) fn crumbs(path: &str) -> Vec<(&str, String)> {
+    let mut out = Vec::new();
+    let mut start = 0;
+    for (i, c) in path.char_indices().chain(std::iter::once((path.len(), '/'))) {
+        if c != '/' && c != '\\' {
+            continue;
+        }
+        if let Some(part) = path.get(start..i).filter(|p| !p.is_empty()) {
+            let mut to = path.get(..i).unwrap_or(path).to_string();
+            if out.is_empty() && part.ends_with(':') && to == part {
+                to.push(if path.contains('\\') { '\\' } else { '/' });
+            }
+            out.push((part, to));
+        }
+        start = i + c.len_utf8();
+    }
+    out
+}
+
 fn folder_breadcrumbs(app: &mut LightcraftApp, ui: &mut egui::Ui, path: &str) {
     let t = Tokens::get(ui.ctx());
     ui.spacing_mut().item_spacing.x = 4.0;
-    let parts: Vec<&str> = path.split(['/', '\\']).filter(|p| !p.is_empty()).collect();
+    let crumbs = crumbs(path);
+    let parts: Vec<&str> = crumbs.iter().map(|(name, _)| *name).collect();
     // With all sidebars open even four ellipses and their separators can exceed the row.
     // Prefer the current folder, showing more ancestors as space permits.
     let visible = ((ui.available_width() / 80.0) as usize).clamp(1, 4);
@@ -754,9 +808,10 @@ fn folder_breadcrumbs(app: &mut LightcraftApp, ui: &mut egui::Ui, path: &str) {
             if r.hovered() {
                 ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
             }
-            if r.clicked() {
-                let prefix = if path.starts_with('/') { format!("/{}", parts[..=i].join("/")) } else { parts[..=i].join("/") };
-                let _ = app.run("library.browse", json!({"path": prefix}));
+            if r.clicked()
+                && let Some((_, to)) = crumbs.get(i)
+            {
+                let _ = app.run("library.browse", json!({"path": to}));
             }
             ui.label(egui::RichText::new("›").size(13.0).color(t.text_dim));
         }
@@ -790,9 +845,46 @@ pub fn drag_feedback(app: &mut LightcraftApp, ctx: &egui::Context) {
 
 pub use super::filterbar::label_color;
 
-/// "Set Color Label" items (coloured dot + the label's name), shared by context menus.
+/// Albums hold library photos (issue #684): true when `ids` are photos and all of them are
+/// browsed (Local) ones, which album views never show.
+pub fn local_only(app: &LightcraftApp, ids: &[PhotoId]) -> bool {
+    !ids.is_empty() && ids.iter().all(|id| app.session.catalog.photo(*id).is_some_and(|p| p.local))
+}
+
+/// Why an album action is off for Local photos.
+pub fn albums_hint() -> String {
+    crate::i18n::tr("Albums hold library photos: Add to My Photos first").to_string()
+}
+
+/// Tell the user when an album command skipped Local photos of the selection (`skipped` in its
+/// result).
+pub fn toast_skipped(app: &mut LightcraftApp, ctx: &egui::Context, r: &serde_json::Value) {
+    if let Some(n) = r.get("skipped").and_then(serde_json::Value::as_u64).filter(|n| *n > 0) {
+        app.toast(
+            ctx,
+            crate::i18n::tr_format!(
+                "{n} Local photo{} skipped: albums hold library photos (Add to My Photos first)",
+                if n == 1 { "" } else { "s" },
+                n = n
+            ),
+        );
+    }
+}
+
+/// "Set Color Label" items for the active photo, shared by context menus.
 pub fn label_menu(app: &mut LightcraftApp, ui: &mut egui::Ui) {
     let current = app.session.active().and_then(|id| app.session.catalog.photo(id)).and_then(|p| p.label);
+    if let Some(l) = label_items(app, ui, current, "photoLabel") {
+        let _ = app.run("photo.label", json!({"label": label_param(l)}));
+        ui.close();
+    }
+}
+
+/// The colour label items of a menu (coloured dot + the label's name, then None and Edit Label
+/// Names…), `current` checked; each colour is widget `<widget>:<colour>` (`<widget>:none`) for
+/// the control channel. Returns the choice (`Some(None)`: None).
+pub fn label_items(app: &mut LightcraftApp, ui: &mut egui::Ui, current: Option<ColorLabel>, widget: &str) -> Option<Option<ColorLabel>> {
+    let mut chosen = None;
     for l in ColorLabel::ALL {
         let name = crate::i18n::color_label(&app.session.catalog, l);
         let resp = ui.horizontal(|ui| {
@@ -800,18 +892,26 @@ pub fn label_menu(app: &mut LightcraftApp, ui: &mut egui::Ui) {
             ui.painter().circle_filled(r.center(), 5.0, label_color(l));
             ui.selectable_label(current == Some(l), name)
         });
+        register(ui.ctx(), format!("{widget}:{}", label_param(Some(l))), resp.inner.rect);
         if resp.inner.clicked() {
-            let _ = app.run("photo.label", json!({"label": format!("{l:?}").to_lowercase()}));
-            ui.close();
+            chosen = Some(Some(l));
         }
     }
-    if ui.selectable_label(current.is_none(), crate::i18n::tr("None")).clicked() {
-        let _ = app.run("photo.label", json!({"label": "none"}));
+    let none = ui.selectable_label(current.is_none(), crate::i18n::tr("None"));
+    register(ui.ctx(), format!("{widget}:none"), none.rect);
+    if none.clicked() {
+        chosen = Some(None);
     }
     ui.separator();
     if ui.button(crate::i18n::tr("Edit Label Names…")).clicked() {
         let _ = app.run("dialog.labelNames", json!({}));
     }
+    chosen
+}
+
+/// A label as the `label` parameter of `photo.label` / `folder.label` names it.
+pub fn label_param(l: Option<ColorLabel>) -> String {
+    l.map_or_else(|| "none".to_string(), |l| format!("{l:?}").to_lowercase())
 }
 
 /// Stack badge at the cell's top-left: the photo count on a collapsed stack's top, `i/n` on the
@@ -851,6 +951,18 @@ pub fn context_menu(app: &mut LightcraftApp, ui: &mut egui::Ui, id: PhotoId) {
     if ui.button(crate::i18n::tr("Open in Detail")).clicked() {
         let _ = app.run("view.detail", json!({}));
     }
+    // Photo ▸ Edit In: a copy with this photo's edits, opened in PhotoCraft or another editor
+    // (desktop only: the web can't start programs)
+    ui.add_enabled_ui(crate::menus::ui_enabled(app, "photo.editInPhotoCraft"), |ui| {
+        ui.menu_button(crate::i18n::tr("Edit In"), |ui| {
+            if ui.button(crate::i18n::tr("Edit in PhotoCraft")).clicked() {
+                let _ = app.run("photo.editInPhotoCraft", json!({}));
+            }
+            if ui.button(crate::i18n::tr("Edit in Other Editor")).clicked() {
+                let _ = app.run("photo.editInExternal", json!({}));
+            }
+        });
+    });
     if ui.button(crate::i18n::tr("Find Similar Photos")).clicked() {
         match app.run("library.findSimilar", json!({"id": id.0})) {
             Ok(r) => {
@@ -883,14 +995,37 @@ pub fn context_menu(app: &mut LightcraftApp, ui: &mut egui::Ui, id: PhotoId) {
         }
     });
     ui.menu_button(crate::i18n::tr("Set Color Label"), |ui| label_menu(app, ui));
-    ui.menu_button(crate::i18n::tr("Add to Album"), |ui| {
-        let albums: Vec<_> = app.session.catalog.albums().filter(|a| !a.folder && !a.is_smart()).map(|a| (a.id.0, a.name.clone())).collect();
-        for (aid, name) in albums {
-            if ui.button(name).clicked() {
-                let _ = app.run("album.addPhotos", json!({"id": aid}));
+    if local_only(app, &app.session.targets(&serde_json::Value::Null)) {
+        // albums hold library photos (issue #684): nothing here to add until they join My Photos
+        let add = ui.add_enabled(false, egui::Button::new(crate::i18n::tr("Add to Album"))).on_disabled_hover_text(albums_hint());
+        register(ui.ctx(), "button:contextAddToAlbum", add.rect);
+    } else {
+        let add = ui.menu_button(crate::i18n::tr("Add to Album"), |ui| {
+            let albums: Vec<_> = app.session.catalog.albums().filter(|a| !a.folder && !a.is_smart()).map(|a| (a.id.0, a.name.clone())).collect();
+            let any = !albums.is_empty();
+            for (aid, name) in albums {
+                let b = ui.button(name);
+                register(ui.ctx(), format!("button:contextAlbum:{aid}"), b.rect);
+                if b.clicked() {
+                    match app.run("album.addPhotos", json!({"id": aid})) {
+                        Ok(r) => toast_skipped(app, ui.ctx(), &r),
+                        Err(e) => app.toast(ui.ctx(), e),
+                    }
+                }
             }
-        }
-    });
+            if any {
+                ui.separator();
+            }
+            // as in the Photo menu: a new album holding the selection, also when there is none yet
+            // to pick (issue #676: the submenu came up empty)
+            let new = ui.button(crate::i18n::tr("New Album…"));
+            register(ui.ctx(), "button:contextNewAlbum", new.rect);
+            if new.clicked() {
+                let _ = app.run("dialog.newAlbum", json!({}));
+            }
+        });
+        register(ui.ctx(), "button:contextAddToAlbum", add.response.rect);
+    }
     // in a (non-smart) album: take the selection out of it, or make this photo its cover
     if let lightcraft_engine::LibrarySource::Album(aid) = app.session.source
         && app.session.catalog.album(aid).is_some_and(|a| !a.folder && !a.is_smart())
@@ -904,6 +1039,22 @@ pub fn context_menu(app: &mut LightcraftApp, ui: &mut egui::Ui, id: PhotoId) {
     }
     if ui.button(crate::i18n::tr("Rename…")).clicked() {
         let _ = app.run("dialog.rename", json!({}));
+    }
+    let can_pick = app.services.pick_folder.is_some() || app.services.picker.is_some();
+    if can_pick && ui.button(crate::i18n::tr("Move to Folder…")).clicked() {
+        // the folder dialog goes through the shared picker (off the UI thread where the host has
+        // one: then photo.moveToFolder runs when it closes)
+        let req = crate::pick::PickRequest::folder(crate::i18n::tr("Move to Folder…"));
+        let picked =
+            crate::pick::ask(app, "photo.moveToFolder", &json!({}), "folder", req, |s| s.pick_folder.as_mut().and_then(|f| f()).map(|x| vec![x]));
+        if let crate::pick::Picked::Now(v) = picked
+            && let Some(into) = v.into_iter().next()
+        {
+            match app.run("photo.moveToFolder", json!({"folder": into})) {
+                Ok(r) => app.toast(ui.ctx(), crate::i18n::tr_format!("Moved {} photo(s)", r["moved"])),
+                Err(e) => app.toast(ui.ctx(), e),
+            }
+        }
     }
     if ui.button(crate::i18n::tr("Reload from Disk")).clicked() {
         let _ = app.run("photo.reload", json!({}));

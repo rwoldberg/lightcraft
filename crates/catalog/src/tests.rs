@@ -266,7 +266,7 @@ fn preview_only_survives_serde_and_set_content_undo() {
     assert_eq!(old.photo(a).unwrap().preview_only, None);
     assert!(old.photo(a).unwrap().develops_raw());
     // Reload: the file decodes now → cleared; undo (through the journal's JSON) restores it
-    let op = Op::SetContent { id: a, width: 6016, height: 4000, file_size: 1, content_hash: None, preview_only: None };
+    let op = Op::SetContent { id: a, width: 6016, height: 4000, file_size: 1, content_hash: None, preview_only: None, kind: None, duration: None };
     let inv = c.apply(op).unwrap();
     assert!(c.photo(a).unwrap().develops_raw());
     let inv: Op = serde_json::from_str(&serde_json::to_string(&inv).unwrap()).unwrap();

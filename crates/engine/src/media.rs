@@ -1392,6 +1392,8 @@ mod thumbnail_hash_tests {
                 file_size: 99,
                 content_hash: Some("replacement".into()),
                 preview_only: None,
+                kind: None,
+                duration: None,
             })
             .unwrap();
         s.media.forget(PhotoId(1));

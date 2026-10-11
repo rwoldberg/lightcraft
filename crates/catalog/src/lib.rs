@@ -205,6 +205,13 @@ pub enum Op {
         /// `None` = its raw data decodes (or it isn't a raw).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         preview_only: Option<String>,
+        /// What kind of media the file turned out to be, when that changed (a video catalogued
+        /// before videos were read); `None` leaves the kind and the duration as they are.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        kind: Option<MediaKind>,
+        /// With `kind`: the video's length in seconds.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        duration: Option<f64>,
     },
     /// The name shown for a colour label (`None` = its colour's name).
     SetLabelName {
@@ -585,9 +592,13 @@ impl Catalog {
                 let old_format = format.map(|f| std::mem::replace(&mut p.format, f));
                 Op::Relink { id, file_name: old_name, source: std::mem::replace(&mut p.source, source), format: old_format }
             }
-            Op::SetContent { id, width, height, file_size, content_hash, preview_only } => {
+            Op::SetContent { id, width, height, file_size, content_hash, preview_only, kind, duration } => {
                 let p = self.photo_mut(id)?;
+                // the kind and the duration change together, or not at all
+                let old_duration = kind.is_some().then(|| std::mem::replace(&mut p.duration, duration)).flatten();
                 Op::SetContent {
+                    kind: kind.map(|k| std::mem::replace(&mut p.kind, k)),
+                    duration: old_duration,
                     id,
                     width: std::mem::replace(&mut p.width, width),
                     height: std::mem::replace(&mut p.height, height),

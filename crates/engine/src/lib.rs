@@ -612,7 +612,7 @@ impl Session {
     /// Change a photo's develop settings. During an interaction the change is previewed without an
     /// undo step; otherwise it is committed with a history entry.
     pub fn set_develop(&mut self, id: PhotoId, settings: DevelopSettings, label: &str) -> Result<()> {
-        if self.catalog.photo(id).is_some_and(|p| p.kind == lightcraft_catalog::MediaKind::Video) {
+        if self.catalog.photo(id).is_some_and(|p| video::is_video_photo(p)) {
             return Err(EngineError::Other("videos can't be edited yet".into()));
         }
         let now = (self.clock)();
@@ -667,7 +667,7 @@ impl Session {
     /// `None` for a photo that isn't there, and for a video: a batch (paste, sync, a preset on a
     /// selection) passes over videos, which can't be edited yet.
     pub fn develop_op(&self, id: PhotoId, settings: DevelopSettings, label: &str) -> Option<Op> {
-        self.catalog.photo(id).filter(|p| p.kind != lightcraft_catalog::MediaKind::Video)?;
+        self.catalog.photo(id).filter(|p| !video::is_video_photo(p))?;
         let settings = Arc::new(settings);
         let step = lightcraft_catalog::HistoryStep { label: label.into(), settings: settings.clone() };
         Some(Op::Batch {

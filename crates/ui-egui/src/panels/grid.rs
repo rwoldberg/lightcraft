@@ -613,12 +613,13 @@ fn cell(app: &mut LightcraftApp, ui: &mut egui::Ui, id: PhotoId, r: Rect, square
         p.line_segment([c + vec2(s * 0.3, -s * 0.3), c + vec2(s, -s * 0.3)], Stroke::new(1.2, Color32::WHITE));
         p.galley(pos2(br.left() + 22.0, br.center().y - g.size().y / 2.0), g, Color32::WHITE);
     }
-    if photo.kind == lightcraft_catalog::MediaKind::Video {
+    if lightcraft_engine::video::is_video_photo(&photo) {
         // a video: a play triangle and its length at the image's bottom left, above the badge bar
         // (always shown: the picture is only its poster)
-        let g = p.layout_no_wrap(crate::video::clock(photo.duration.unwrap_or(0.0)), t.semibold(9.5), Color32::WHITE);
+        // (no length for one catalogued before videos were read: Reload from Disk fills it in)
+        let g = p.layout_no_wrap(photo.duration.map(crate::video::clock).unwrap_or_default(), t.semibold(9.5), Color32::WHITE);
         let at = pos2(img_rect.left() + 6.0, img_rect.bottom() - 30.0 - 16.0);
-        let br = Rect::from_min_size(at, vec2(g.size().x + 24.0, 16.0));
+        let br = Rect::from_min_size(at, vec2(g.size().x + if g.size().x > 0.0 { 24.0 } else { 20.0 }, 16.0));
         p.rect_filled(br, 8.0, Color32::from_black_alpha(170));
         let c = pos2(br.left() + 10.0, br.center().y);
         p.add(egui::Shape::convex_polygon(vec![c + vec2(-3.0, -4.0), c + vec2(4.0, 0.0), c + vec2(-3.0, 4.0)], Color32::WHITE, Stroke::NONE));

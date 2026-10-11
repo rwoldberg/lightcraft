@@ -806,6 +806,8 @@ mod thumbnail_tests {
                 file_size: 99,
                 content_hash: Some("changed".into()),
                 preview_only: None,
+                kind: None,
+                duration: None,
             })
             .unwrap();
         assert!(!r.thumb_current(catalog.photo(PhotoId(1)).unwrap(), 384, 10));

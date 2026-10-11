@@ -192,3 +192,28 @@ fn a_video_that_cannot_be_played_says_why() {
         let _ = std::fs::remove_dir_all(&dir);
     }
 }
+
+/// A clip that an older import catalogued as an ordinary picture (a Lightroom catalog's "VIDEO"
+/// row) showed in the loupe with no way to play it. It gets the player like any video.
+#[test]
+fn a_video_catalogued_as_a_picture_still_gets_the_player() {
+    use lightcraft_catalog::{Op, Photo, Source};
+    let (mut h, video, _, dir) = clip_in_detail("legacy");
+    // the same file again, as that import left it
+    let path = dir.join("clip.mp4").to_string_lossy().to_string();
+    let id = h.app.session.catalog.alloc_photo_id();
+    let old = Photo::new(id, Source::File { path }, "clip.mp4", "VIDEO", 160, 120, "2026-10-09T00:00:00");
+    assert_eq!(old.kind, MediaKind::Image);
+    h.app.session.commit("old import", Op::AddPhoto { photo: Box::new(old) }).unwrap();
+    assert_ne!(id, video);
+    h.request("engine.execute", json!({"command": "library.select", "params": {"ids": [id.0]}}), SETTLE);
+    h.settle(SETTLE);
+    for widget in ["video:play", "video:seek", "video:picture"] {
+        assert_eq!(widget_ids(&mut h, widget), vec![widget.to_string()]);
+    }
+    assert_eq!(widget_ids(&mut h, "notice:videoNoEdit").len() + widget_ids(&mut h, "slider:").len(), widget_ids(&mut h, "notice:videoNoEdit").len());
+    h.app.run("video.play", json!({})).unwrap();
+    assert!(h.step_until(SETTLE, |h| position(h) > 0.3), "{}", status(&h));
+    assert_eq!(status(&h)["photo"], id.0);
+    let _ = std::fs::remove_dir_all(&dir);
+}

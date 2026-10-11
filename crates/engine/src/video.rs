@@ -21,6 +21,13 @@ pub fn is_video(path: &str) -> bool {
     Path::new(path).extension().is_some_and(|e| EXTENSIONS.contains(&e.to_string_lossy().to_lowercase().as_str()))
 }
 
+/// Is this catalogue entry a video? Its kind says so; so does its file's name, for entries made
+/// before videos were read (or by a catalog import while the file could not be probed), which
+/// stay playable until Reload from Disk corrects them.
+pub fn is_video_photo(photo: &lightcraft_catalog::Photo) -> bool {
+    photo.kind == MediaKind::Video || matches!(&photo.source, lightcraft_catalog::Source::File { path } if is_video(path))
+}
+
 /// Bytes hashed at each end of a video for [`ProbeInfo::content_hash`].
 const HASH_SPAN: u64 = 1 << 20;
 

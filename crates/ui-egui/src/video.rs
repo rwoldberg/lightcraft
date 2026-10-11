@@ -11,7 +11,7 @@ use std::sync::{Arc, Condvar, Mutex, MutexGuard, PoisonError};
 use std::time::Duration;
 
 use egui::{Align2, Color32, Rect, Sense, Stroke, pos2, vec2};
-use lightcraft_catalog::{MediaKind, PhotoId};
+use lightcraft_catalog::PhotoId;
 use lightcraft_video::Frame;
 use serde_json::{Value, json};
 
@@ -330,7 +330,7 @@ fn current(app: &LightcraftApp) -> Option<(PhotoId, String, f64)> {
         return None;
     }
     let id = app.session.active()?;
-    let photo = app.session.catalog.photo(id).filter(|p| p.kind == MediaKind::Video)?;
+    let photo = app.session.catalog.photo(id).filter(|p| lightcraft_engine::video::is_video_photo(p))?;
     let lightcraft_catalog::Source::File { path } = &photo.source else { return None };
     Some((id, path.clone(), photo.duration.unwrap_or(0.0)))
 }

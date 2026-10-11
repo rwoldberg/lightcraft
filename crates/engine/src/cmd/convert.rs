@@ -169,10 +169,14 @@ fn edit_external(s: &mut Session, p: &Value) -> Result<Value> {
 /// `None` when nothing changed. Covers a raw that became decodable (or stopped being: a different
 /// file relinked), i.e. a change of [`lightcraft_catalog::Photo::preview_only`].
 pub(crate) fn content_op(id: lightcraft_catalog::PhotoId, ph: &lightcraft_catalog::Photo, info: crate::media::ProbeInfo) -> Option<Op> {
+    // a video catalogued as something else (added before videos were read, or named by a
+    // Lightroom catalog while its file could not be probed), or one whose length is not known yet
+    let video = info.kind == lightcraft_catalog::MediaKind::Video && (ph.kind != info.kind || ph.duration != info.duration);
     let same = info.content_hash == ph.content_hash
         && info.file_size == ph.file_size
         && (info.width, info.height) == (ph.width, ph.height)
-        && info.preview_only == ph.preview_only;
+        && info.preview_only == ph.preview_only
+        && !video;
     (!same).then_some(Op::SetContent {
         id,
         width: info.width,
@@ -180,6 +184,8 @@ pub(crate) fn content_op(id: lightcraft_catalog::PhotoId, ph: &lightcraft_catalo
         file_size: info.file_size,
         content_hash: info.content_hash,
         preview_only: info.preview_only,
+        kind: video.then_some(info.kind),
+        duration: info.duration.filter(|_| video),
     })
 }
 

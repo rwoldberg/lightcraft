@@ -323,7 +323,7 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
     };
     let Some(photo) = app.session.catalog.photo(id).cloned() else { return };
     // a video: its poster, then its frames, and a transport bar (no develop tools apply)
-    if photo.kind == lightcraft_catalog::MediaKind::Video {
+    if lightcraft_engine::video::is_video_photo(&photo) {
         crate::video::show_loupe(app, ui, canvas, &photo);
         return;
     }

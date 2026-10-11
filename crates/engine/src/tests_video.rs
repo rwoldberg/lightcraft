@@ -183,3 +183,41 @@ fn video_extensions_are_importable() {
     }
     assert!(!crate::video::is_video("photo.jpg") && !crate::video::is_video("mov") && !crate::video::is_video(""));
 }
+
+/// A clip named by a Lightroom catalog imported before videos were read sat in the library as an
+/// ordinary picture ("VIDEO", 0 B): the loupe showed no player for it. Such an entry counts as a
+/// video by its file, and Reload from Disk makes the catalog say so (undoably).
+#[test]
+fn a_video_catalogued_as_a_picture_is_still_a_video_and_reload_corrects_it() {
+    use lightcraft_catalog::{Op, Photo, Source};
+    let src = temp_dir("legacy");
+    let path = src.join("GOPR0001.MP4");
+    std::fs::write(&path, clip(&small()).unwrap()).unwrap();
+    let mut s = Session::new().with_fs();
+    let id = PhotoId(1);
+    let old = Photo::new(id, Source::File { path: path.to_string_lossy().into() }, "GOPR0001.MP4", "VIDEO", 3840, 2160, "2026-10-09T00:00:00");
+    assert_eq!((old.kind, old.duration, old.file_size), (MediaKind::Image, None, 0));
+    s.commit("old import", Op::AddPhoto { photo: Box::new(old) }).unwrap();
+    let photo = |s: &Session| s.catalog.photo(id).map(|p| (**p).clone()).unwrap();
+    // already treated as a video: playable, not editable
+    assert!(crate::video::is_video_photo(&photo(&s)));
+    assert!(s.set_develop(id, lightcraft_develop::DevelopSettings::default(), "Exposure").is_err());
+    // Reload: the catalog now says what the file is
+    s.selection = crate::Selection::single(id);
+    let r = s.execute("photo.reload", &json!({"ids": [id.0]})).unwrap();
+    assert_eq!(r["reloaded"], json!([id.0]), "{r}");
+    let now = photo(&s);
+    assert_eq!((now.kind, now.width, now.height), (MediaKind::Video, 64, 48));
+    assert!((now.duration.unwrap() - 0.5).abs() < 1e-6 && now.file_size > 0);
+    let q = s.execute("catalog.query", &json!({"filter": {"kind": "video"}})).unwrap();
+    assert_eq!(q["photos"].as_array().map(Vec::len), Some(1), "{q}");
+    // nothing left to correct; and it can be undone
+    assert_eq!(s.execute("photo.reload", &json!({"ids": [id.0]})).unwrap()["reloaded"], json!([]));
+    s.execute("edit.undo", &json!({})).unwrap();
+    let back = photo(&s);
+    assert_eq!((back.kind, back.duration, back.width, back.file_size), (MediaKind::Image, None, 3840, 0));
+    // an ordinary picture is not a video, whatever it is called inside
+    let still = Photo::new(PhotoId(9), Source::File { path: "C:/pictures/mov.jpg".into() }, "mov.jpg", "JPEG", 4, 3, "now");
+    assert!(!crate::video::is_video_photo(&still));
+    let _ = std::fs::remove_dir_all(&src);
+}

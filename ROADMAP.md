@@ -10,7 +10,7 @@ projects (DrawCraft reached its first four milestones in ≈ 4½ h) and are revi
 [`docs/parity.md`](docs/parity.md) counts features that **exist**; this section is about whether a photographer can
 **switch** from Lightroom. Update it when a gap below closes.*
 
-**In one line:** the checklist says **79.7%** (P0 98.2%, P1 95.6%, P2 41.6%), but measured by whether a working
+**In one line:** the checklist says **80.3%** (P0 98.2%, P1 96.7%, P2 42.9%), but measured by whether a working
 photographer could replace Lightroom without noticing, we are at roughly **60–70%**. The remaining gap is mostly
 **quality of results and camera coverage**, not missing buttons.
 
@@ -97,7 +97,7 @@ yet guarantee original-pixel detail; visible-region rendering remains a gap (LR-
 | M15 | Classic modules | Map, Book, Slideshow, Print, Web; smart collections, stacks, virtual copies, publish services, tethering | 25–40 | 🚧 (smart albums, stacks, virtual copies, compare/survey ✅; Map/Book/Slideshow/Print/Web ⬜) |
 | M16 | 1.0 polish | preferences, shortcut editor, accessibility, localization, packaging (dmg/msi/AppImage/web), hardening | 10–20 | 🚧 (settings, keyboard shortcuts sheet, packaging basics ✅; English/Chinese (Simplified, Traditional)/Japanese/Brazilian Portuguese/German localisation 🟡; accessibility and further locales ⬜) |
 
-## Parity estimate (feature count updated 2026-10-08; effort estimate from 2026-10-02)
+## Parity estimate (feature count updated 2026-10-11; effort estimate from 2026-10-02)
 
 **By feature count** — from `docs/parity.md` (one row per Lightroom feature, menu item and shortcut; `cargo xtask
 parity` prints this line on every run, so it stays current):
@@ -105,9 +105,9 @@ parity` prints this line on every run, so it stays current):
 | Scope | Weighted completion | Rows | 2026-10-02 |
 |---|---:|---:|---:|
 | P0 (core) | **98.2%** | 200 | 98.7% |
-| P1 (important parity) | **95.6%** | 149 | 94.4% |
-| P2 (later / AI / niche, incl. Classic modules) | **41.6%** | 160 | 29.4% |
-| **All in-scope rows** | **79.7%** | 509 | 75.6% |
+| P1 (important parity) | **96.7%** | 152 | 94.4% |
+| P2 (later / AI / niche, incl. Classic modules) | **42.9%** | 163 | 29.4% |
+| **All in-scope rows** | **80.3%** | 516 | 75.6% |
 
 The 2026-10-05 count includes three new 🟡 rows that make quality gaps visible (camera colour calibration, verified
 camera coverage, render fidelity), which is why P0 dipped slightly.

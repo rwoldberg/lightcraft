@@ -70,6 +70,8 @@ mod tests_unsaved;
 #[cfg(test)]
 mod tests_video;
 #[cfg(test)]
+mod tests_video_play;
+#[cfg(test)]
 mod tests_zoom;
 
 use std::sync::mpsc::{Receiver, Sender};
@@ -243,6 +245,8 @@ pub struct LightcraftApp {
     pub import: Option<import::ImportTask>,
     /// A folder scan in progress (feeds the import review).
     pub scan: Option<import::ScanTask>,
+    /// The video playing (or paused) in the loupe.
+    pub video: Option<video::Player>,
     /// A Lightroom catalog inspect/import in progress.
     pub lightroom: Option<lightroom_import::LightroomTask>,
     /// Last terminal Lightroom result, exposed by the command's status/wait response.
@@ -314,6 +318,7 @@ impl LightcraftApp {
             merge: merge::MergeState::default(),
             import: None,
             scan: None,
+            video: None,
             lightroom: None,
             lightroom_last: None,
             export: None,
@@ -739,6 +744,7 @@ impl LightcraftApp {
         import::poll_scan(self, ctx);
         import::tick(self, ctx);
         lightroom_import::tick(self, ctx);
+        video::tick(self);
         tasks::poll(self, ctx);
         self.preview_build_status(ctx);
         self.save_status(ctx);

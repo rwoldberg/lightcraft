@@ -349,6 +349,11 @@ pub fn handle(app: &mut LightcraftApp, ctx: &egui::Context) {
             app.toast(ctx, if paused { "Slideshow resumed" } else { "Slideshow paused" });
             continue;
         }
+        // Space plays / pauses the video in the loupe (Z still zooms)
+        if id == "view.zoomToggle" && crate::video::available(app) && ctx.input(|i| i.key_pressed(Key::Space)) {
+            let _ = app.run("video.playPause", serde_json::json!({}));
+            continue;
+        }
         // flag/rate aliases (Shift+X…) go through the culling path: active photo in Compare/Survey,
         // `advance` moves to the next candidate there
         if matches!(id, "photo.flag" | "photo.rate" | "photo.label") {

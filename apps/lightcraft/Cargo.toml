@@ -16,6 +16,8 @@ rawnind-model = ["denoise", "lightcraft-engine/rawnind-model"]
 # Open HEIC/HEIF photos (the optional lightcraft-heif crate). Not default so distributors choose
 # it (HEVC patents); build with `--features heif` to include it.
 heif = ["lightcraft-codecs/heif"]
+# Play H.265 / HEVC video (most iPhone clips). Not default for the same reason as `heif`.
+video-hevc = ["lightcraft-engine/video-hevc"]
 
 [dependencies]
 lightcraft-engine = { workspace = true, features = ["sam"] }

@@ -322,6 +322,11 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
         return;
     };
     let Some(photo) = app.session.catalog.photo(id).cloned() else { return };
+    // a video: its poster, then its frames, and a transport bar (no develop tools apply)
+    if photo.kind == lightcraft_catalog::MediaKind::Video {
+        crate::video::show_loupe(app, ui, canvas, &photo);
+        return;
+    }
     let d = (*photo.develop).clone();
     // the full-screen preview shows the photo only: no tool overlays
     let right = if fullscreen { RightPanel::None } else { app.ui.right };

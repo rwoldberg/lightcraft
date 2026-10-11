@@ -74,6 +74,14 @@ pub const UI_COMMANDS: &[UiCommand] = &[
     ("view.zoomFit", "Zoom to Fit", Some("Cmd+0"), "View"),
     ("view.zoom100", "Zoom 100%", Some("Cmd+Alt+0"), "View"),
     ("view.zoomToggle", "Toggle Zoom", Some("Z"), "View"),
+    // a video in Detail (Space plays / pauses there instead of zooming)
+    ("video.playPause", "Play / Pause Video", None, ""),
+    ("video.play", "Play Video", None, ""),
+    ("video.pause", "Pause Video", None, ""),
+    ("video.seek", "Go to a Time in the Video", None, ""),
+    ("video.step", "Step One Frame", None, ""),
+    ("video.stop", "Stop Video", None, ""),
+    ("video.status", "Video Playback Status", None, ""),
     // the ratio a click (and Z / Space) zooms to
     ("view.clickZoom", "Click Zoom Ratio", None, ""),
     ("view.navigate", "Set Image Zoom and Pan", None, ""),
@@ -258,6 +266,9 @@ pub fn run_ui_command(app: &mut LightcraftApp, id: &str, p: &Value) -> Option<Re
     if matches!(id, "library.inspectLightroom" | "library.importLightroom") {
         let ctx = egui::Context::default();
         return Some(crate::lightroom_import::command(app, id, p, &ctx));
+    }
+    if let Some(result) = crate::video::command(app, id, p) {
+        return Some(result);
     }
     if let Some(language) = language_from_command(id) {
         app.ui.language = language;
@@ -1475,6 +1486,8 @@ pub fn ui_enabled(app: &LightcraftApp, id: &str) -> bool {
         "app.openLogFolder" => app.services.reveal.is_some() && app.services.log_file.is_some(),
         "file.restoreLibrary" => app.services.restore_library.is_some(),
         "compare.swap" | "compare.makeSelect" => app.ui.view == ViewMode::Compare,
+        "video.status" | "video.stop" => true,
+        s if s.starts_with("video.") => crate::video::available(app),
         s if s.starts_with("dialog.merge") || (s.starts_with("merge.") && s.ends_with("Last")) => {
             app.session.targets(&serde_json::json!({})).len() >= 2 && app.merge.final_task.is_none()
         }

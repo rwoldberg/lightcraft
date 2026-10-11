@@ -53,6 +53,7 @@ pub mod rename;
 pub mod segment;
 pub mod sidecar;
 pub mod smart;
+pub mod video;
 mod view;
 pub mod walk;
 
@@ -611,6 +612,9 @@ impl Session {
     /// Change a photo's develop settings. During an interaction the change is previewed without an
     /// undo step; otherwise it is committed with a history entry.
     pub fn set_develop(&mut self, id: PhotoId, settings: DevelopSettings, label: &str) -> Result<()> {
+        if self.catalog.photo(id).is_some_and(|p| p.kind == lightcraft_catalog::MediaKind::Video) {
+            return Err(EngineError::Other("videos can't be edited yet".into()));
+        }
         let now = (self.clock)();
         let settings = Arc::new(settings);
         if let Some(i) = &self.interaction
@@ -659,8 +663,11 @@ impl Session {
     }
 
     /// The op that sets a photo's develop settings and appends a History entry (for batches).
+    ///
+    /// `None` for a photo that isn't there, and for a video: a batch (paste, sync, a preset on a
+    /// selection) passes over videos, which can't be edited yet.
     pub fn develop_op(&self, id: PhotoId, settings: DevelopSettings, label: &str) -> Option<Op> {
-        self.catalog.photo(id)?;
+        self.catalog.photo(id).filter(|p| p.kind != lightcraft_catalog::MediaKind::Video)?;
         let settings = Arc::new(settings);
         let step = lightcraft_catalog::HistoryStep { label: label.into(), settings: settings.clone() };
         Some(Op::Batch {
@@ -876,5 +883,7 @@ mod tests_segment;
 mod tests_settings_files;
 #[cfg(test)]
 mod tests_spots;
+#[cfg(test)]
+mod tests_video;
 #[cfg(test)]
 mod tests_xmp;

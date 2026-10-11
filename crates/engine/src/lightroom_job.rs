@@ -468,6 +468,17 @@ mod tests {
         assert_eq!(session.undo.len(), 3);
     }
 
+    /// A catalog row for a video whose file is gone is still catalogued as a video.
+    #[test]
+    fn a_missing_video_named_by_the_catalog_is_a_video() {
+        let mut session = crate::Session::new();
+        let mut prepared = prepared_for(&session, "/missing/holiday.mov", 3);
+        prepared.data.photos[0].image.insert("fileFormat".into(), serde_json::json!("VIDEO"));
+        commit_prepared(&mut session, prepared).unwrap();
+        let photo = session.catalog.photo(lightcraft_catalog::PhotoId(1)).unwrap();
+        assert_eq!((photo.kind, photo.rating), (lightcraft_catalog::MediaKind::Video, 3));
+    }
+
     #[test]
     fn oversized_history_archive_keeps_prepared_import_successful_with_warning() {
         let archive_dir = std::env::temp_dir().join(format!("lightcraft-lr-prepared-scale-{}", std::process::id()));

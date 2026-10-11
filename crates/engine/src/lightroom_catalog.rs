@@ -707,6 +707,10 @@ pub(crate) fn apply_prepared(s: &mut crate::Session, data: CatalogImport, contex
             if ["RAW", "DNG", "ARW", "CR2", "CR3", "NEF", "NRW", "RAF", "ORF", "RW2", "PEF"].contains(&p.format.to_uppercase().as_str()) {
                 p.kind = lightcraft_catalog::MediaKind::Raw;
             }
+            // a video whose file is missing (one that is there was probed and added above)
+            if p.format.eq_ignore_ascii_case("VIDEO") {
+                p.kind = lightcraft_catalog::MediaKind::Video;
+            }
             p
         };
         ids.insert(src.source_id, p.id);

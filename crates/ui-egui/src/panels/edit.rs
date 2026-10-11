@@ -74,6 +74,16 @@ fn rel_to_k(r: f64) -> f64 {
 
 pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui, id: PhotoId) {
     let t = Tokens::get(ui.ctx());
+    // a video is shown by its poster: there is nothing to develop yet, so no sliders that would fail
+    if app.session.catalog.photo(id).is_some_and(|p| p.kind == lightcraft_catalog::MediaKind::Video) {
+        let (hr, _) = ui.allocate_exact_size(vec2(ui.available_width(), 40.0), Sense::hover());
+        ui.painter().text(pos2(hr.left() + 24.0, hr.bottom() - 10.0), Align2::LEFT_CENTER, crate::i18n::tr("Edit"), t.semibold(15.0), t.text);
+        egui::Frame::NONE.inner_margin(egui::Margin { left: 24, right: 22, top: 8, bottom: 14 }).show(ui, |ui| {
+            let r = ui.label(egui::RichText::new(crate::i18n::tr("Videos can't be edited yet.")).size(12.5).color(t.text_label));
+            crate::widgets::register(ui.ctx(), "notice:videoNoEdit", r.rect);
+        });
+        return;
+    }
     let d = app.session.develop_of(id).unwrap_or_default();
     // a raw shown from its embedded JPEG (preview only) gets the rendered-file white balance scale
     let raw = app.session.catalog.photo(id).is_some_and(|p| p.develops_raw() && !p.relative_wb());

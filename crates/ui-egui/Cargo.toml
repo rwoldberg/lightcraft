@@ -25,6 +25,8 @@ serde_json = { workspace = true }
 log = { workspace = true }
 
 [dev-dependencies]
+# generated test clips (an H.264 encoder: tests only)
+lightcraft-video = { workspace = true, features = ["testkit"] }
 lightcraft-denoise = { workspace = true, features = ["runtime"] }
 lightcraft-codecs = { workspace = true }
 lightcraft-faces = { workspace = true }

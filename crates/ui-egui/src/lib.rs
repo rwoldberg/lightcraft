@@ -30,6 +30,7 @@ pub mod state;
 pub mod tasks;
 pub mod theme;
 pub mod titlebar;
+pub mod video;
 pub mod widgets;
 
 #[cfg(test)]
@@ -66,6 +67,8 @@ mod tests_switch_library;
 mod tests_titlebar;
 #[cfg(test)]
 mod tests_unsaved;
+#[cfg(test)]
+mod tests_video;
 #[cfg(test)]
 mod tests_zoom;
 

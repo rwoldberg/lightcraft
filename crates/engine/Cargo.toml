@@ -27,6 +27,7 @@ lightcraft-meta = { workspace = true }
 lightcraft-faces = { workspace = true }
 miniz_oxide = { workspace = true }
 lightcraft-merge = { workspace = true }
+lightcraft-video = { workspace = true }
 rayon = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -47,7 +48,11 @@ lightcraft-fetch = { workspace = true }
 sam = ["dep:lightcraft-segment"]
 denoise = ["dep:lightcraft-denoise", "lightcraft-denoise/runtime", "lightcraft-gpu/denoise"]
 rawnind-model = ["denoise", "lightcraft-denoise/rawnind-model", "lightcraft-denoise-core/rawnind-model"]
+# Play H.265 / HEVC video (most iPhone clips). Optional like HEIC: HEVC patents are a distributor's call.
+video-hevc = ["lightcraft-video/hevc"]
 
 [dev-dependencies]
+# generated test clips (an H.264 encoder: tests only)
+lightcraft-video = { workspace = true, features = ["testkit"] }
 libc = { workspace = true }
 lightcraft-tiff = { workspace = true }

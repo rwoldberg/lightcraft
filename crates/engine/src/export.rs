@@ -1373,6 +1373,10 @@ fn prepare_guarded(
 ) -> Result<PreparedExport, String> {
     let p = session.catalog.photo(id).ok_or("no such photo")?;
     let file_name = o.file_name_for(p, seq);
+    // a video's poster is not the video: only the file itself can be exported until video export exists
+    if p.kind == lightcraft_catalog::MediaKind::Video && o.format != ExportFormat::Original {
+        return Err(format!("{} is a video: it can only be exported as its original file", p.file_name));
+    }
     let work = if o.format.is_rendered() {
         let (w, h) = output_size(p, o);
         let meta = export_metadata(p, o);

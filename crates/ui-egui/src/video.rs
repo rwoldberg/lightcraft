@@ -22,12 +22,29 @@ use crate::sound::{AudioOut, Clock, Sound};
 use crate::theme::Tokens;
 use crate::widgets::register;
 
-/// Decoded frames kept ahead of the one on screen.
-const AHEAD: usize = 6;
+/// Seconds of decoded frames kept ahead of the one on screen. The decoders work on many frames
+/// at once and hand them over in bursts (a 4K HEVC clip: about 20 frames every 450 ms), so the
+/// next burst has to be asked for while this much of the last one is still waiting.
+const AHEAD_S: f64 = 0.8;
+/// The fewest and the most frames kept ahead, whatever the frame rate.
+const AHEAD_MIN: usize = 6;
+const AHEAD_MAX: usize = 36;
+/// The long edge (pixels) frames are decoded at for playback, at most: a larger view shows them
+/// enlarged. Converting and keeping a queue of full 4K frames costs more time and memory than
+/// decoding in software leaves.
+const PLAY_EDGE: u32 = 1920;
+
+/// Frames to keep ahead at `rate` frames a second.
+fn ahead(rate: f64) -> usize {
+    let rate = if rate.is_finite() && rate > 0.0 { rate } else { 30.0 };
+    ((rate * AHEAD_S).ceil() as usize).clamp(AHEAD_MIN, AHEAD_MAX)
+}
 /// The transport bar under a video.
 const BAR_HEIGHT: f32 = 44.0;
 /// Seconds the picture may lag the sound before the sound waits for it.
 const BEHIND_S: f64 = 0.25;
+/// The most times a player halves the size it decodes at because the picture could not keep up.
+const MAX_COARSER: u32 = 2;
 
 /// A length in seconds as a clock: `0:07`, `12:34`, `1:02:03`.
 pub fn clock(seconds: f64) -> String {
@@ -90,6 +107,15 @@ pub struct Player {
     sound: Option<Sound>,
     /// The picture fell behind the sound: the sound waits until frames are ready again.
     buffering: bool,
+    /// The seek whose frame queue has been full once: playing starts then, not on the first
+    /// frames of a burst with the next one still half a second away.
+    primed: Option<u64>,
+    /// Times the sound had to wait for the picture.
+    waits: u64,
+    /// Halvings of the size frames are decoded at, one for every second time the sound had to
+    /// wait (once can be a busy moment): a softer picture that keeps up is better than a sharp one
+    /// that stutters.
+    coarser: u32,
     /// Volume and mute as last applied (for the status).
     volume: f32,
     muted: bool,
@@ -112,7 +138,7 @@ fn fail(shared: &Shared, generation: u64, error: String) {
     }
 }
 
-/// The decode thread: opens the file, then keeps [`AHEAD`] frames ready from the last seek.
+/// The decode thread: opens the file, then keeps [`AHEAD_S`] of frames ready from the last seek.
 #[cfg(not(target_arch = "wasm32"))]
 fn work(shared: &Shared, path: &str, repaint: &egui::Context) {
     let opened = lightcraft_video::Video::open_path(path).and_then(|video| {
@@ -132,9 +158,11 @@ fn work(shared: &Shared, path: &str, repaint: &egui::Context) {
         }
     };
     shared.lock().info = Some((info.duration, info.frame_rate));
-    // the frames waiting to be shown count as working memory, so background decodes make room
-    let bytes = (info.width as usize).saturating_mul(info.height as usize).saturating_mul(4).saturating_mul(AHEAD);
-    let _permit = lightcraft_engine::memory::work_gate().acquire_urgent(bytes);
+    let ahead = ahead(info.frame_rate);
+    // the frames waiting to be shown (the queue, and as many again in the decoder's last burst)
+    // count as working memory, so background decodes make room
+    let pixels = (info.width as usize).saturating_mul(info.height as usize).min(PLAY_EDGE as usize * PLAY_EDGE as usize * 9 / 16);
+    let _permit = lightcraft_engine::memory::work_gate().acquire_urgent(pixels.saturating_mul(4).saturating_mul(ahead * 2));
     let mut generation = 0u64;
     loop {
         {
@@ -155,7 +183,7 @@ fn work(shared: &Shared, path: &str, repaint: &egui::Context) {
                     }
                     break;
                 }
-                if st.error.is_none() && !st.ended && st.frames.len() < AHEAD {
+                if st.error.is_none() && !st.ended && st.frames.len() < ahead {
                     break;
                 }
                 st = shared.wake.wait_timeout(st, Duration::from_millis(100)).unwrap_or_else(PoisonError::into_inner).0;
@@ -218,6 +246,9 @@ impl Player {
             frames_dropped: 0,
             sound,
             buffering: false,
+            primed: None,
+            waits: 0,
+            coarser: 0,
             volume: 1.0,
             muted: false,
             note: None,
@@ -235,6 +266,8 @@ impl Player {
             "error": self.error,
             "framesShown": self.frames_shown,
             "framesDropped": self.frames_dropped,
+            "waits": self.waits,
+            "reduced": self.coarser,
             "audio": self.sound.as_ref().map(|sound| sound.status(self.muted, self.volume, self.note.clone())),
         })
     }
@@ -288,15 +321,19 @@ impl Player {
         (self.volume, self.muted) = (volume, muted);
         self.note = out.as_ref().and_then(|out| out.note());
         // the sound runs while the picture it belongs to is on screen and keeping up
-        let run = self.playing && self.shown == Some(self.generation) && !self.buffering;
+        let primed = self.primed == Some(self.generation);
+        let run = self.playing && self.shown == Some(self.generation) && primed && !self.buffering;
         let gain = if muted { 0.0 } else { volume };
         let clock = self.sound.as_mut().map_or(Clock::Wall, |sound| sound.update(out, now, run, gain));
         let mut due = None;
         let mut st = self.shared.lock();
-        if self.buffering && (st.frames.len() >= AHEAD / 2 || st.ended || !self.playing) {
+        if !primed && st.generation == self.generation && st.seek.is_none() && (st.frames.len() >= ahead(self.frame_rate) || st.ended) {
+            self.primed = Some(self.generation);
+        }
+        if self.buffering && (st.frames.len() >= ahead(self.frame_rate) / 2 || st.ended || !self.playing) {
             self.buffering = false;
         }
-        st.max_edge = Some(max_edge.max(16));
+        st.max_edge = Some((max_edge.min(PLAY_EDGE) >> self.coarser).max(16));
         if let Some((duration, rate)) = st.info {
             if duration > 0.0 {
                 self.duration = duration;
@@ -315,7 +352,7 @@ impl Player {
             if due.is_some() {
                 self.started = None;
             }
-        } else if self.playing && clock != Clock::Hold {
+        } else if self.playing && clock != Clock::Hold && self.primed == Some(self.generation) {
             let time = match clock {
                 // the sound says where playback is; should it stop, the wall clock carries on from here
                 Clock::Audio(time) => {
@@ -343,14 +380,18 @@ impl Player {
                 } else if matches!(clock, Clock::Audio(_)) {
                     // decoding is behind the sound: a little is caught up by passing over late
                     // frames; more than that and the sound waits for the picture
-                    self.buffering |= time - self.position > BEHIND_S;
+                    if !self.buffering && time - self.position > BEHIND_S {
+                        self.buffering = true;
+                        self.waits += 1;
+                        self.coarser = u32::try_from(self.waits / 2).unwrap_or(MAX_COARSER).min(MAX_COARSER);
+                    }
                 } else {
                     // decoding is behind: the clock waits for it instead of skipping ahead
                     self.started = Some((now, self.position));
                 }
             }
         } else if self.playing {
-            // waiting for the sound to be ready: time does not pass
+            // waiting for the sound or the frame queue to be ready: time does not pass
             self.started = None;
         }
         if st.ended && st.frames.is_empty() && self.shown == Some(self.generation) && !self.playing && self.position + 1e-6 >= self.duration {
@@ -652,6 +693,18 @@ pub fn show_loupe(app: &mut LightcraftApp, ui: &mut egui::Ui, canvas: Rect, phot
 #[cfg(test)]
 mod tests {
     use super::clock;
+
+    #[test]
+    fn the_frame_queue_covers_a_decoders_burst() {
+        // a 4K HEVC clip comes out about 20 frames at a time: more than that must be kept ahead
+        assert_eq!(super::ahead(30.0), 24);
+        assert_eq!(super::ahead(12.0), 10);
+        assert_eq!((super::ahead(1.0), super::ahead(240.0)), (super::AHEAD_MIN, super::AHEAD_MAX));
+        // a rate a damaged file gives is treated as 30
+        for odd in [0.0, -5.0, f64::NAN, f64::INFINITY] {
+            assert_eq!(super::ahead(odd), 24, "{odd}");
+        }
+    }
 
     #[test]
     fn lengths_read_as_clocks() {

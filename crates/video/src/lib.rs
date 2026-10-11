@@ -1104,18 +1104,37 @@ mod tests {
     }
 
     /// Open and decode a real file: `LC_VIDEO_FILE=<path> cargo test -p lightcraft-video real_file -- --nocapture`.
+    /// Use `--release` for timings.
     #[test]
     fn real_file_opens_and_decodes() {
         let Ok(path) = std::env::var("LC_VIDEO_FILE") else { return };
         let video = Video::open_path(&path).unwrap();
         println!("{path}: {:?}", video.info());
         let mut reader = video.reader().unwrap();
+        // as the player asks for them: `LC_VIDEO_EDGE=<pixels>` (the view's long edge), `LC_VIDEO_DRAFT=1`
+        reader.set_max_edge(std::env::var("LC_VIDEO_EDGE").ok().and_then(|e| e.parse().ok()));
+        reader.set_draft(std::env::var_os("LC_VIDEO_DRAFT").is_some());
         let (started, mut frames) = (std::time::Instant::now(), 0usize);
+        // how long each frame took to come out: a decoder gives frames in bursts, and the
+        // longest gaps are what a player's queue has to cover
+        let (mut last, mut gaps) = (started, Vec::new());
         while let Some(frame) = reader.next_frame().unwrap() {
             assert_eq!(frame.rgba.len(), frame.width as usize * frame.height as usize * 4);
             frames += 1;
+            gaps.push(last.elapsed().as_secs_f64() * 1e3);
+            last = std::time::Instant::now();
         }
         println!("{frames} of {} frames, {:.1} ms a frame", video.info().frames, started.elapsed().as_secs_f64() * 1e3 / frames.max(1) as f64);
+        let slow: Vec<String> = gaps.iter().enumerate().filter(|(_, ms)| **ms > 50.0).take(24).map(|(i, ms)| format!("{i}: {ms:.0}")).collect();
+        gaps.sort_by(f64::total_cmp);
+        let at = |q: f64| gaps.get(((gaps.len() as f64 - 1.0) * q) as usize).copied().unwrap_or(0.0);
+        println!(
+            "gaps between frames, ms: median {:.1}, 90 % {:.1}, 99 % {:.1}, longest {:.1}; over 50 ms (frame: ms): {slow:?}",
+            at(0.5),
+            at(0.9),
+            at(0.99),
+            at(1.0)
+        );
         assert!(frames > 0);
         if video.info().audio.as_ref().is_some_and(|a| a.playable) {
             let mut reader = video.audio_reader().unwrap();

@@ -229,6 +229,8 @@ fn services(originals: Originals, backend: Option<Backend>, files: Files, frozen
             w.open_with_url_and_target(url, "_blank").map(|_| ()).map_err(|_| "the browser blocked the new tab".to_string())
         })),
         pick_folder: None,
+        // videos don't play in the browser build yet, so there is no sound to give them
+        audio: None,
     }
 }
 

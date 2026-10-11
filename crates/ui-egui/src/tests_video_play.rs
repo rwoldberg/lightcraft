@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use lightcraft_catalog::{MediaKind, PhotoId};
 use lightcraft_engine::Session;
-use lightcraft_video::testkit::{Clip, clip};
+use lightcraft_video::testkit::{Clip, Sound, clip};
 use serde_json::{Value, json};
 
 use crate::headless::Headless;
@@ -35,7 +35,7 @@ fn clip_in_detail(tag: &str) -> (Headless, PhotoId, PhotoId, std::path::PathBuf)
 }
 
 /// [`clip_in_detail`] for a clip of the caller's making.
-fn this_clip_in_detail(tag: &str, name: &str, video: &Clip) -> (Headless, PhotoId, PhotoId, std::path::PathBuf) {
+pub(crate) fn this_clip_in_detail(tag: &str, name: &str, video: &Clip) -> (Headless, PhotoId, PhotoId, std::path::PathBuf) {
     let dir = std::env::temp_dir().join(format!("lc-ui-video-{tag}-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
@@ -56,11 +56,11 @@ fn this_clip_in_detail(tag: &str, name: &str, video: &Clip) -> (Headless, PhotoI
     (h, video, photo, dir)
 }
 
-fn status(h: &Headless) -> Value {
+pub(crate) fn status(h: &Headless) -> Value {
     h.app.video.as_ref().map_or(Value::Null, crate::video::Player::status)
 }
 
-fn position(h: &Headless) -> f64 {
+pub(crate) fn position(h: &Headless) -> f64 {
     status(h)["position"].as_f64().unwrap_or(-1.0)
 }
 
@@ -134,7 +134,7 @@ fn a_video_plays_pauses_seeks_and_steps_in_the_loupe() {
 /// frame is a key frame).
 #[test]
 fn a_motion_jpeg_clip_plays_in_the_loupe() {
-    let old = Clip { width: 160, height: 120, frames: 36, fps: 12, motion_jpeg: true, quicktime: true, sound: true, ..Clip::default() };
+    let old = Clip { width: 160, height: 120, frames: 36, fps: 12, motion_jpeg: true, quicktime: true, sound: Some(Sound::Pcm8), ..Clip::default() };
     let (mut h, video, _, dir) = this_clip_in_detail("mjpeg", "P8250039.MOV", &old);
     assert_eq!(widget_ids(&mut h, "video:play"), vec!["video:play".to_string()]);
     shot(&mut h, "mjpeg-poster.png");

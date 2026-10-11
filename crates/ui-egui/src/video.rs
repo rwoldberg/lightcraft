@@ -4,7 +4,8 @@
 //! A [`Player`] is made when a video is first played (looking at a poster costs nothing). It owns
 //! one worker thread that opens the file and decodes frames a few ahead; the UI thread only picks
 //! the frame that is due and uploads it to a texture, so a slow drive or a heavy clip never stalls
-//! a frame of the app. Playing has no sound yet.
+//! a frame of the app. The clip's sound plays through the host's loudspeaker when it has one
+//! ([`crate::sound`]), and then the sound is the clock the picture follows.
 
 use std::collections::VecDeque;
 use std::sync::{Arc, Condvar, Mutex, MutexGuard, PoisonError};
@@ -17,6 +18,7 @@ use serde_json::{Value, json};
 
 use crate::LightcraftApp;
 use crate::render::Slot;
+use crate::sound::{AudioOut, Clock, Sound};
 use crate::theme::Tokens;
 use crate::widgets::register;
 
@@ -24,6 +26,8 @@ use crate::widgets::register;
 const AHEAD: usize = 6;
 /// The transport bar under a video.
 const BAR_HEIGHT: f32 = 44.0;
+/// Seconds the picture may lag the sound before the sound waits for it.
+const BEHIND_S: f64 = 0.25;
 
 /// A length in seconds as a clock: `0:07`, `12:34`, `1:02:03`.
 pub fn clock(seconds: f64) -> String {
@@ -82,6 +86,15 @@ pub struct Player {
     error: Option<String>,
     frames_shown: u64,
     frames_dropped: u64,
+    /// The clip's sound (none in the browser build).
+    sound: Option<Sound>,
+    /// The picture fell behind the sound: the sound waits until frames are ready again.
+    buffering: bool,
+    /// Volume and mute as last applied (for the status).
+    volume: f32,
+    muted: bool,
+    /// What the host's output says about the hardware.
+    note: Option<String>,
 }
 
 impl Drop for Player {
@@ -175,6 +188,7 @@ impl Player {
         let shared = Arc::new(Shared::default());
         shared.lock().seek = Some(0.0);
         let (for_worker, repaint) = (shared.clone(), ctx.clone());
+        let sound_path = path.clone();
         std::thread::Builder::new()
             .name("lc-video-decode".into())
             .spawn(move || {
@@ -185,6 +199,8 @@ impl Player {
                 }
             })
             .map_err(|e| format!("could not start the video player: {e}"))?;
+        // without its sound thread the video plays silently
+        let sound = Sound::open(sound_path, ctx);
         Ok(Player {
             photo,
             shared,
@@ -200,6 +216,11 @@ impl Player {
             error: None,
             frames_shown: 0,
             frames_dropped: 0,
+            sound,
+            buffering: false,
+            volume: 1.0,
+            muted: false,
+            note: None,
         })
     }
 
@@ -214,6 +235,7 @@ impl Player {
             "error": self.error,
             "framesShown": self.frames_shown,
             "framesDropped": self.frames_dropped,
+            "audio": self.sound.as_ref().map(|sound| sound.status(self.muted, self.volume, self.note.clone())),
         })
     }
 
@@ -232,6 +254,15 @@ impl Player {
         st.error = None;
         drop(st);
         self.shared.wake.notify_all();
+        self.buffering = false;
+        if let Some(sound) = self.sound.as_mut() {
+            sound.seek(to, self.generation);
+        }
+    }
+
+    /// Why this video plays without sound, when it does.
+    fn silent(&self) -> Option<String> {
+        self.sound.as_ref().and_then(Sound::silent)
     }
 
     fn set_playing(&mut self, on: bool) {
@@ -251,10 +282,20 @@ impl Player {
         self.seek(self.position + (frames as f64 + 0.25) / rate);
     }
 
-    /// Take the frame that is due at app time `now` and put it on screen.
-    fn update(&mut self, ctx: &egui::Context, now: f64, max_edge: u32) {
+    /// Take the frame that is due at app time `now` and put it on screen. `out` is the host's
+    /// loudspeaker, `volume` 0..1.
+    fn update(&mut self, ctx: &egui::Context, now: f64, max_edge: u32, out: Option<&mut (dyn AudioOut + 'static)>, volume: f32, muted: bool) {
+        (self.volume, self.muted) = (volume, muted);
+        self.note = out.as_ref().and_then(|out| out.note());
+        // the sound runs while the picture it belongs to is on screen and keeping up
+        let run = self.playing && self.shown == Some(self.generation) && !self.buffering;
+        let gain = if muted { 0.0 } else { volume };
+        let clock = self.sound.as_mut().map_or(Clock::Wall, |sound| sound.update(out, now, run, gain));
         let mut due = None;
         let mut st = self.shared.lock();
+        if self.buffering && (st.frames.len() >= AHEAD / 2 || st.ended || !self.playing) {
+            self.buffering = false;
+        }
         st.max_edge = Some(max_edge.max(16));
         if let Some((duration, rate)) = st.info {
             if duration > 0.0 {
@@ -274,10 +315,20 @@ impl Player {
             if due.is_some() {
                 self.started = None;
             }
-        } else if self.playing {
-            let (at, from) = *self.started.get_or_insert((now, self.position));
+        } else if self.playing && clock != Clock::Hold {
+            let time = match clock {
+                // the sound says where playback is; should it stop, the wall clock carries on from here
+                Clock::Audio(time) => {
+                    self.started = Some((now, time));
+                    time
+                }
+                _ => {
+                    let (at, from) = *self.started.get_or_insert((now, self.position));
+                    from + (now - at)
+                }
+            };
             let half = if self.frame_rate > 0.0 { 0.5 / self.frame_rate } else { 0.0 };
-            let target = from + (now - at) + half;
+            let target = time + half;
             while st.frames.front().is_some_and(|(_, f)| f.time <= target) {
                 if due.is_some() {
                     // late: a newer frame is due too
@@ -289,11 +340,18 @@ impl Player {
                 if st.ended {
                     self.playing = false;
                     self.ended = true;
+                } else if matches!(clock, Clock::Audio(_)) {
+                    // decoding is behind the sound: a little is caught up by passing over late
+                    // frames; more than that and the sound waits for the picture
+                    self.buffering |= time - self.position > BEHIND_S;
                 } else {
                     // decoding is behind: the clock waits for it instead of skipping ahead
                     self.started = Some((now, self.position));
                 }
             }
+        } else if self.playing {
+            // waiting for the sound to be ready: time does not pass
+            self.started = None;
         }
         if st.ended && st.frames.is_empty() && self.shown == Some(self.generation) && !self.playing && self.position + 1e-6 >= self.duration {
             self.ended = true;
@@ -340,10 +398,15 @@ pub fn available(app: &LightcraftApp) -> bool {
     current(app).is_some()
 }
 
-/// End playback when the loupe no longer shows the player's video.
+/// End playback when the loupe no longer shows the player's video, and the sound with it.
 pub fn tick(app: &mut LightcraftApp) {
     if app.video.as_ref().is_some_and(|player| current(app).is_none_or(|(id, ..)| id != player.photo)) {
         app.video = None;
+    }
+    if app.video.is_none()
+        && let Some(out) = app.services.audio.as_mut()
+    {
+        out.stop();
     }
 }
 
@@ -364,14 +427,28 @@ fn player(app: &mut LightcraftApp) -> Result<&mut Player, String> {
 /// - `video.step {frames}` (default 1; negative steps back): pauses
 /// - `video.stop`: ends playback and shows the poster again
 /// - `video.status`
+/// - `video.mute {on?}` (without `on`: toggles), `video.volume {level}` (0..1): remembered in the
+///   app's settings; these two return `{muted, volume}`
 ///
-/// Each returns the player's status (`null` when there is no player).
+/// The others return the player's status (`null` when there is no player).
 pub fn command(app: &mut LightcraftApp, id: &str, p: &Value) -> Option<Result<Value, String>> {
     if !id.starts_with("video.") {
         return None;
     }
     let run = |app: &mut LightcraftApp| -> Result<Value, String> {
         match id {
+            "video.mute" => {
+                let on = p.get("on").and_then(Value::as_bool).unwrap_or(!app.ui.settings.video_muted);
+                app.ui.settings.video_muted = on;
+                return Ok(json!({"muted": on, "volume": app.ui.settings.video_volume}));
+            }
+            "video.volume" => {
+                let level = p.get("level").and_then(Value::as_f64).filter(|l| l.is_finite()).ok_or("video.volume: give `level` (0 to 1)")?;
+                app.ui.settings.video_volume = level.clamp(0.0, 1.0) as f32;
+                // turning the volume up is asking to hear it
+                app.ui.settings.video_muted &= level <= 0.0;
+                return Ok(json!({"muted": app.ui.settings.video_muted, "volume": app.ui.settings.video_volume}));
+            }
             "video.status" => {}
             "video.stop" => app.video = None,
             "video.playPause" => {
@@ -400,6 +477,34 @@ pub fn command(app: &mut LightcraftApp, id: &str, p: &Value) -> Option<Result<Va
     Some(run(app))
 }
 
+/// A loudspeaker: its cone, and waves for the volume or a cross when muted.
+fn speaker_glyph(p: &egui::Painter, c: egui::Pos2, size: f32, level: f32, muted: bool, color: Color32) {
+    let (x, half) = (c.x - size * 0.5, size * 0.5);
+    let cone = vec![
+        pos2(x, c.y - half * 0.36),
+        pos2(x + size * 0.24, c.y - half * 0.36),
+        pos2(x + size * 0.52, c.y - half * 0.84),
+        pos2(x + size * 0.52, c.y + half * 0.84),
+        pos2(x + size * 0.24, c.y + half * 0.36),
+        pos2(x, c.y + half * 0.36),
+    ];
+    p.add(egui::Shape::convex_polygon(cone, color, Stroke::NONE));
+    let stroke = Stroke::new(1.4, color);
+    let from = pos2(x + size * 0.56, c.y);
+    if muted || level <= 0.0 {
+        let (a, r) = (from + vec2(size * 0.28, 0.0), size * 0.15);
+        p.line_segment([a + vec2(-r, -r), a + vec2(r, r)], stroke);
+        p.line_segment([a + vec2(-r, r), a + vec2(r, -r)], stroke);
+        return;
+    }
+    // one wave for a low volume, two from about half
+    for wave in 0..if level < 0.5 { 1 } else { 2 } {
+        let r = size * (0.16 + 0.2 * wave as f32);
+        let arc: Vec<egui::Pos2> = (-4..=4).map(|i| i as f32 * 0.2).map(|a: f32| from + vec2(a.cos() * r, a.sin() * r)).collect();
+        p.add(egui::Shape::line(arc, stroke));
+    }
+}
+
 fn play_glyph(p: &egui::Painter, c: egui::Pos2, size: f32, playing: bool, color: Color32) {
     if playing {
         for dx in [-0.3, 0.3] {
@@ -424,8 +529,9 @@ pub fn show_loupe(app: &mut LightcraftApp, ui: &mut egui::Ui, canvas: Rect, phot
     let ppp = ui.ctx().pixels_per_point();
     let edge = (img.width().max(img.height()) * ppp).ceil().max(16.0) as u32;
     let now = ui.input(|i| i.time);
+    let (volume, muted) = (app.ui.settings.video_volume, app.ui.settings.video_muted);
     if let Some(player) = app.video.as_mut().filter(|p| p.photo == id) {
-        player.update(ui.ctx(), now, edge);
+        player.update(ui.ctx(), now, edge, app.services.audio.as_deref_mut(), volume, muted);
     }
     let p = ui.painter_at(canvas);
     let frame = app.video.as_ref().filter(|p| p.photo == id).and_then(|p| p.texture.as_ref().map(egui::TextureHandle::id));
@@ -493,7 +599,37 @@ pub fn show_loupe(app: &mut LightcraftApp, ui: &mut egui::Ui, canvas: Rect, phot
     let time = p.text(pos2(button.right() + 12.0, mid), Align2::LEFT_CENTER, clock(position), t.font(12.0), t.text_label);
     let length = p.text(pos2(bar.right() - 20.0, mid), Align2::RIGHT_CENTER, clock(duration), t.font(12.0), t.text_dim);
     register(ui.ctx(), "video:time", time);
-    let track = Rect::from_min_max(pos2(time.right() + 14.0, mid - 10.0), pos2((length.left() - 14.0).max(time.right() + 15.0), mid + 10.0));
+    // the volume: a loudspeaker that mutes, and a short slider
+    let silent = app.video.as_ref().filter(|p| p.photo == id).and_then(Player::silent);
+    let slider = Rect::from_min_max(pos2(length.left() - 14.0 - 56.0, mid - 10.0), pos2(length.left() - 14.0, mid + 10.0));
+    let speaker = Rect::from_center_size(pos2(slider.left() - 20.0, mid), vec2(28.0, 28.0));
+    let m = ui.interact(speaker, egui::Id::new("video-mute"), Sense::click());
+    let m = match &silent {
+        Some(why) => m.on_hover_text(format!("{}: {why}", crate::i18n::tr("No sound"))),
+        None => m.on_hover_text(crate::i18n::tr(if muted { "Unmute" } else { "Mute" })),
+    };
+    register(ui.ctx(), "video:mute", speaker);
+    if m.hovered() {
+        p.rect_filled(speaker, 6.0, t.hover);
+    }
+    speaker_glyph(&p, speaker.center(), 16.0, volume, muted, if silent.is_some() { t.text_dim } else { t.text });
+    if m.clicked() {
+        act = Some(("video.mute", json!({})));
+    }
+    let v = ui.interact(slider, egui::Id::new("video-volume"), Sense::click_and_drag()).on_hover_text(crate::i18n::tr("Volume"));
+    register(ui.ctx(), "video:volume", slider);
+    let shown = if muted { 0.0 } else { volume.clamp(0.0, 1.0) };
+    let groove = Rect::from_min_max(pos2(slider.left(), mid - 1.5), pos2(slider.right(), mid + 1.5));
+    p.rect_filled(groove, 1.5, t.hover);
+    let knob = slider.left() + slider.width() * shown;
+    p.rect_filled(Rect::from_min_max(groove.min, pos2(knob, groove.bottom())), 1.5, t.text_label);
+    p.circle_filled(pos2(knob, mid), if v.hovered() || v.dragged() { 5.5 } else { 4.0 }, t.text);
+    if (v.clicked() || v.dragged())
+        && let Some(pointer) = v.interact_pointer_pos()
+    {
+        act = Some(("video.volume", json!({"level": ((pointer.x - slider.left()) / slider.width()).clamp(0.0, 1.0)})));
+    }
+    let track = Rect::from_min_max(pos2(time.right() + 14.0, mid - 10.0), pos2((speaker.left() - 12.0).max(time.right() + 15.0), mid + 10.0));
     let s = ui.interact(track, egui::Id::new("video-seek"), Sense::click_and_drag());
     register(ui.ctx(), "video:seek", track);
     let fraction = if duration > 0.0 { (position / duration).clamp(0.0, 1.0) as f32 } else { 0.0 };

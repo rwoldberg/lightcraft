@@ -336,6 +336,9 @@ cargo run --release -p lightcraft-cli -- render photo.jpg -o out.jpg --set light
 cargo xtask ci                                          # fmt, clippy, tests, layering, wasm checks
 ```
 
+Building on Linux needs the ALSA development files for the sound of videos (`sudo apt install libasound2-dev`,
+`sudo dnf install alsa-lib-devel`); FreeBSD needs `alsa-lib`. macOS and Windows need nothing extra.
+
 CI defaults to line-table debug information and one build job per 1.5 GB of RAM
 available when it starts (at most one per CPU; 4 if memory can't be read), so an
 8 GB machine with 6 GB free builds with 4, and a busy machine with little free

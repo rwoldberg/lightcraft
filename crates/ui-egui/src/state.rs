@@ -156,6 +156,10 @@ pub struct AppSettings {
     pub grid_badges: GridBadges,
     /// Shortcuts the user changed (Help ▸ Keyboard Shortcuts): command id → shortcut, `""` = none.
     pub keymap: crate::shortcuts::Keymap,
+    /// The volume videos play at, 0..1 (`video.volume`).
+    pub video_volume: f32,
+    /// Videos play without sound (`video.mute`).
+    pub video_muted: bool,
 }
 
 impl Default for AppSettings {
@@ -172,6 +176,8 @@ impl Default for AppSettings {
             film_badges: true,
             grid_badges: GridBadges::Auto,
             keymap: Default::default(),
+            video_volume: 1.0,
+            video_muted: false,
         }
     }
 }

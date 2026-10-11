@@ -89,9 +89,9 @@ fn intra_layer_allowed(from: &str, to: &str) -> bool {
     })
 }
 
-/// External crates that constitute a UI toolkit / windowing dependency.
-/// Entries ending in `*` are prefixes.
-pub const UI_CRATES: &[&str] = &["egui", "eframe", "winit", "egui_kittest", "rfd", "bevy*"];
+/// External crates that constitute a UI toolkit / windowing / device dependency (`cpal`: audio
+/// output). Entries ending in `*` are prefixes.
+pub const UI_CRATES: &[&str] = &["egui", "eframe", "winit", "egui_kittest", "rfd", "cpal", "bevy*"];
 
 /// First layer allowed to use UI crates.
 pub const UI_MIN_LAYER: u8 = 5;
@@ -292,7 +292,7 @@ mod tests {
 
     #[test]
     fn ui_crates_forbidden_below_l5() {
-        for dep in ["egui", "eframe", "winit", "rfd"] {
+        for dep in ["egui", "eframe", "winit", "rfd", "cpal"] {
             let v = check(&[c("lightcraft-engine", &[(dep, Normal, false)])]);
             assert!(matches!(v[..], [Violation::UiBelowL5 { .. }]), "{dep}");
         }

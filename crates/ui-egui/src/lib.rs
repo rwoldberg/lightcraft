@@ -26,6 +26,8 @@ pub mod region;
 pub mod render;
 pub mod shortcuts;
 pub mod softpaint;
+#[cfg_attr(target_arch = "wasm32", allow(dead_code))]
+pub mod sound;
 pub mod state;
 pub mod tasks;
 pub mod theme;
@@ -71,6 +73,8 @@ mod tests_unsaved;
 mod tests_video;
 #[cfg(test)]
 mod tests_video_play;
+#[cfg(test)]
+mod tests_video_sound;
 #[cfg(test)]
 mod tests_zoom;
 
@@ -150,6 +154,8 @@ pub struct Services {
     pub backup_library: Option<HostAction>,
     /// File ▸ Restore Library from Backup… (web only; keeps the current library).
     pub restore_library: Option<HostAction>,
+    /// The loudspeaker, for the sound of videos (desktop only; without it videos play silently).
+    pub audio: Option<Box<dyn sound::AudioOut>>,
 }
 
 #[derive(Clone, Copy, Debug, Default)]

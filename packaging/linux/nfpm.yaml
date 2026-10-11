@@ -23,15 +23,16 @@ description: |-
   presets; GPU processing (wgpu). Includes lightcraft-cli, a headless renderer
   and command runner.
 
-# The binaries link only glibc and libgcc_s directly. Windowing (X11/Wayland, xkbcommon) and the
-# GPU (Vulkan, EGL/GL) are loaded at runtime, so they are dependencies/recommendations here
-# rather than ELF NEEDED entries.
+# The binaries link glibc, libgcc_s and, for the sound of videos, ALSA (libasound, through cpal).
+# Windowing (X11/Wayland, xkbcommon) and the GPU (Vulkan, EGL/GL) are loaded at runtime, so they
+# are dependencies/recommendations here rather than ELF NEEDED entries.
 overrides:
   deb:
     depends:
       - libc6 (>= 2.35)
       - libgcc-s1
       - libxkbcommon0
+      - libasound2
       - libvulkan1 | libegl1
     recommends:
       - libwayland-client0
@@ -45,6 +46,7 @@ overrides:
   rpm:
     depends:
       - libxkbcommon
+      - alsa-lib
       - (vulkan-loader or libglvnd-egl)
     recommends:
       - libwayland-client

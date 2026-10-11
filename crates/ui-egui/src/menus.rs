@@ -82,6 +82,8 @@ pub const UI_COMMANDS: &[UiCommand] = &[
     ("video.step", "Step One Frame", None, ""),
     ("video.stop", "Stop Video", None, ""),
     ("video.status", "Video Playback Status", None, ""),
+    ("video.mute", "Mute Video Sound", None, ""),
+    ("video.volume", "Set Video Volume", None, ""),
     // the ratio a click (and Z / Space) zooms to
     ("view.clickZoom", "Click Zoom Ratio", None, ""),
     ("view.navigate", "Set Image Zoom and Pan", None, ""),
@@ -1486,7 +1488,7 @@ pub fn ui_enabled(app: &LightcraftApp, id: &str) -> bool {
         "app.openLogFolder" => app.services.reveal.is_some() && app.services.log_file.is_some(),
         "file.restoreLibrary" => app.services.restore_library.is_some(),
         "compare.swap" | "compare.makeSelect" => app.ui.view == ViewMode::Compare,
-        "video.status" | "video.stop" => true,
+        "video.status" | "video.stop" | "video.mute" | "video.volume" => true,
         s if s.starts_with("video.") => crate::video::available(app),
         s if s.starts_with("dialog.merge") || (s.starts_with("merge.") && s.ends_with("Last")) => {
             app.session.targets(&serde_json::json!({})).len() >= 2 && app.merge.final_task.is_none()

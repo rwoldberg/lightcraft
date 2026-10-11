@@ -4,7 +4,7 @@ MP4 and QuickTime video (`.mp4`, `.mov`, `.m4v`) for LightCraft: what a file hol
 image, and its frames. A thin, panic-guarded wrapper around FilmCraft's clean-room, pure-Rust
 (no `unsafe`, MIT OR Apache-2.0) demuxer and decoders: `filmcraft-isobmff`, `filmcraft-h264`, and
 `filmcraft-hevc` behind the `hevc` feature. Motion JPEG (what older digital cameras recorded) is
-decoded with `zune-jpeg`.
+decoded with `zune-jpeg`, and the sound with `filmcraft-aac` (PCM is read directly).
 
 ```rust
 let video = lightcraft_video::Video::open_path("clip.mov")?;   // headers only
@@ -16,6 +16,11 @@ let mut reader = video.reader()?;                              // owns its decod
 reader.set_max_edge(Some(1280));                               // whole-factor reduction for a small view
 reader.seek(12.5)?;
 while let Some(frame) = reader.next_frame()? { /* frame.rgba, frame.width, frame.height, frame.time */ }
+if info.audio.as_ref().is_some_and(|a| a.playable) {             // codec, sample_rate, channels, duration
+    let mut sound = video.audio_reader()?;                       // owns its decoder: Send
+    sound.seek(12.5)?;
+    while let Some(block) = sound.next_block()? { /* block.samples (interleaved f32), block.time */ }
+}
 ```
 
 - **Never read whole.** `Video::open` reads the file's headers through a `ByteSource` (a `File`,
@@ -28,6 +33,11 @@ while let Some(frame) = reader.next_frame()? { /* frame.rgba, frame.width, frame
 - **Motion JPEG.** Sample entry `jpeg`: every frame is a JPEG picture and a key frame, so a seek
   lands on any frame directly. A damaged frame is passed over and the rest play (a file with no
   frame left has no pictures: an error). Interlaced Motion JPEG (`mjpa`, `mjpb`) is not read.
+- **Sound.** AAC (AAC-LC; of HE-AAC the core) and uncompressed PCM (8, 16, 24, 32-bit integer,
+  32 and 64-bit float). Blocks are interleaved `f32` in -1..1 at the track's own rate, front left
+  and right first, each with the time it is heard; a seek lands on the sample heard then. A
+  damaged AAC packet is silence for its length. Other formats (`ulaw`, `ac-3`, `.mp3`…) are named
+  in `AudioInfo::codec` with `playable` false: the picture plays without them.
 - **Errors, never panics.** `Error::Unsupported` (no video track, a codec without a decoder
   here), `Error::Limit`, `Error::Malformed`, `Error::Io`. Sizes and counts from the file are
   checked before use, and every call into the demuxer and decoders runs under `catch_unwind`.
@@ -35,7 +45,6 @@ while let Some(frame) = reader.next_frame()? { /* frame.rgba, frame.width, frame
 
 ## Not yet
 
-- Sound (the audio track is only reported: `Info::has_audio`).
 - HDR video is shown without tone mapping (HLG / PQ pictures look flat).
 - Codecs other than H.264, HEVC and Motion JPEG (ProRes, AV1, interlaced Motion JPEG…): the
   file opens, `playable` is false and `reader()` is `Error::Unsupported`. HEVC 4:2:2 and 12-bit
@@ -49,13 +58,15 @@ while let Some(frame) = reader.next_frame()? { /* frame.rgba, frame.width, frame
   Without it an HEVC file still opens and gives its embedded preview; `reader()` is a clear
   "HEVC video isn't included in this build" error.
 - `testkit`: generated test clips (`lightcraft_video::testkit::clip`: H.264 or Motion JPEG, with
-  or without a sound track), which needs an H.264 and a JPEG encoder. For tests only; no product
+  or without a sound track: PCM or AAC), which needs an H.264 and a JPEG encoder. For tests only; no product
   build enables it. LightCraft never commits media.
 
 ## A real file
 
 `LC_VIDEO_FILE=<path> cargo test -p lightcraft-video real_file -- --nocapture` opens a file of
-yours, prints what its headers say, decodes every frame and reports the time a frame took.
+yours, prints what its headers say, decodes every frame and its sound and reports the time taken.
+`LC_VIDEO_CLIPS=<folder> cargo test -p lightcraft-video sample_clips` writes a few generated
+clips (with and without sound) to try in the app.
 
 ## The pin
 

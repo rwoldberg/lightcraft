@@ -1,7 +1,7 @@
 //! Video files in the library: import, poster, and what they refuse (M14.2).
 
 use lightcraft_catalog::{MediaKind, PhotoId};
-use lightcraft_video::testkit::{Clip, clip};
+use lightcraft_video::testkit::{Clip, Sound, clip};
 use serde_json::json;
 
 use crate::Session;
@@ -72,7 +72,7 @@ fn videos_import_with_kind_duration_and_a_poster() {
 #[test]
 fn a_motion_jpeg_clip_imports_with_a_poster() {
     let src = temp_dir("mjpeg");
-    let old = Clip { motion_jpeg: true, quicktime: true, sound: true, ..small() };
+    let old = Clip { motion_jpeg: true, quicktime: true, sound: Some(Sound::Pcm8), ..small() };
     std::fs::write(src.join("P8250039.MOV"), clip(&old).unwrap()).unwrap();
     let mut s = Session::new().with_fs();
     let r = s.execute("library.import", &json!({"paths": [src.to_string_lossy()]})).unwrap();

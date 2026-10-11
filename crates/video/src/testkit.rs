@@ -28,14 +28,42 @@ pub struct Clip {
     pub quicktime: bool,
     /// Motion JPEG (every frame a JPEG picture, all of them key frames) instead of H.264.
     pub motion_jpeg: bool,
-    /// A second track of sound: 8-bit PCM at 8 kHz, a steady tone. In a QuickTime file it is
-    /// stored under the code `raw `, as older cameras did.
-    pub sound: bool,
+    /// A second track of sound, as long as the picture ([`sound_at`] says what is heard when).
+    pub sound: Option<Sound>,
+}
+
+/// The sound track of a [`Clip`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Sound {
+    /// 8-bit PCM, 8 kHz, one channel. In a QuickTime file it is stored under the code `raw `, as
+    /// older cameras did.
+    Pcm8,
+    /// 16-bit PCM, 48 kHz, two channels (the right one at half the level of the left).
+    Pcm16,
+    /// AAC, 48 kHz, two channels (the right one at half the level of the left).
+    Aac,
+}
+
+impl Sound {
+    /// Samples a second.
+    pub fn rate(self) -> u32 {
+        if self == Sound::Pcm8 { 8000 } else { 48_000 }
+    }
+
+    pub fn channels(self) -> usize {
+        if self == Sound::Pcm8 { 1 } else { 2 }
+    }
+}
+
+/// What a clip's sound holds at `seconds` (left channel, -1..1): nothing for the first quarter
+/// of a second, then a steady 440 Hz tone. A test can tell where in the clip a sample is from.
+pub fn sound_at(seconds: f64) -> f32 {
+    if seconds < 0.25 { 0.0 } else { (0.5 * (seconds * 440.0 * std::f64::consts::TAU).sin()) as f32 }
 }
 
 impl Default for Clip {
     fn default() -> Self {
-        Clip { width: 64, height: 48, frames: 12, fps: 24, keyint: 5, rotation: 0, cover: None, quicktime: false, motion_jpeg: false, sound: false }
+        Clip { width: 64, height: 48, frames: 12, fps: 24, keyint: 5, rotation: 0, cover: None, quicktime: false, motion_jpeg: false, sound: None }
     }
 }
 
@@ -169,18 +197,50 @@ fn jpeg_track(c: &Clip, writer: &mut Writer) -> Result<(), String> {
     Ok(())
 }
 
-/// Samples a second of the clip's sound.
-const SOUND_RATE: u32 = 8000;
-
-/// The clip's sound: as long as its picture, 8-bit PCM, one channel.
-fn sound_track(c: &Clip, writer: &mut Writer) -> Result<(), String> {
-    let config = PcmConfig { bits: 8, float: false, big_endian: true, signed: false, channels: 1, sample_rate: f64::from(SOUND_RATE) };
-    let track = writer.add_track(TrackConfig::new(SampleEntry::pcm(config), SOUND_RATE)).map_err(|e| e.to_string())?;
-    let samples = u64::from(c.frames) * u64::from(SOUND_RATE) / u64::from(c.fps);
-    // a 500 Hz square wave around the middle (8-bit sound is unsigned)
-    let data: Vec<u8> = (0..samples).map(|i| if (i / 8) % 2 == 0 { 160 } else { 96 }).collect();
-    for block in data.chunks(1024) {
-        let sample = WriteSample { data: block, duration: block.len() as u32, composition_offset: 0, is_sync: true };
+/// The clip's sound: as long as its picture.
+fn sound_track(c: &Clip, sound: Sound, writer: &mut Writer) -> Result<(), String> {
+    let (rate, channels) = (sound.rate(), sound.channels());
+    let frames = (u64::from(c.frames) * u64::from(rate) / u64::from(c.fps)) as usize;
+    let left: Vec<f32> = (0..frames).map(|i| sound_at(i as f64 / f64::from(rate))).collect();
+    if sound == Sound::Aac {
+        let right: Vec<f32> = left.iter().map(|v| v * 0.5).collect();
+        let mut encoder = filmcraft_aac::Encoder::new(filmcraft_aac::EncoderConfig::cbr(rate, channels, 128_000)).map_err(|e| e.to_string())?;
+        let mut packets = encoder.encode(&[&left, &right]);
+        packets.extend(encoder.flush());
+        let entry = SampleEntry::aac(encoder.audio_specific_config(), channels as u32, rate);
+        // the encoder's lead-in is not part of the clip: the track starts after it
+        let config = TrackConfig { media_start: Some(i64::from(encoder.priming_samples())), ..TrackConfig::new(entry, rate) };
+        let track = writer.add_track(config).map_err(|e| e.to_string())?;
+        for data in &packets {
+            let sample = WriteSample { data, duration: filmcraft_aac::FRAME_LEN as u32, composition_offset: 0, is_sync: true };
+            writer.write_sample(track, sample).map_err(|e| e.to_string())?;
+        }
+        return Ok(());
+    }
+    let bits = if sound == Sound::Pcm8 { 8 } else { 16 };
+    let config = PcmConfig {
+        bits,
+        float: false,
+        big_endian: true,
+        signed: bits != 8 || !c.quicktime,
+        channels: channels as u32,
+        sample_rate: f64::from(rate),
+    };
+    let track = writer.add_track(TrackConfig::new(SampleEntry::pcm(config), rate)).map_err(|e| e.to_string())?;
+    let mut data = Vec::new();
+    for v in &left {
+        if bits == 8 {
+            // 8-bit sound is unsigned, around 128, in a QuickTime file and signed in an MP4
+            let level = (v * 127.0).round() as i8;
+            data.push(if c.quicktime { (i16::from(level) + 128) as u8 } else { level as u8 });
+        } else {
+            data.extend_from_slice(&((v * 32_767.0).round() as i16).to_be_bytes());
+            data.extend_from_slice(&((v * 0.5 * 32_767.0).round() as i16).to_be_bytes());
+        }
+    }
+    let frame = channels * usize::from(bits / 8);
+    for block in data.chunks(1024 * frame) {
+        let sample = WriteSample { data: block, duration: (block.len() / frame) as u32, composition_offset: 0, is_sync: true };
         writer.write_sample(track, sample).map_err(|e| e.to_string())?;
     }
     Ok(())
@@ -199,8 +259,8 @@ pub fn clip(c: &Clip) -> Result<Vec<u8>, String> {
     } else {
         h264_track(c, &mut writer)?;
     }
-    if c.sound {
-        sound_track(c, &mut writer)?;
+    if let Some(sound) = c.sound {
+        sound_track(c, sound, &mut writer)?;
     }
     let mut bytes = writer.finish().map_err(|e| e.to_string())?.into_inner();
     if !c.rotation.is_multiple_of(4) {

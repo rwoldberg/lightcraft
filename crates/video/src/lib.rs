@@ -3,8 +3,9 @@
 //!
 //! A thin wrapper around FilmCraft's clean-room, pure-Rust demuxer (`filmcraft-isobmff`) and
 //! decoders (`filmcraft-h264`, and `filmcraft-hevc` behind the `hevc` feature), with `zune-jpeg`
-//! for Motion JPEG (what older digital cameras recorded). Its API is plain data ([`Info`],
-//! [`Frame`], [`Error`]) so the crate knows nothing about the rest of LightCraft.
+//! for Motion JPEG (what older digital cameras recorded), and `filmcraft-aac` for the sound
+//! ([`AudioReader`]). Its API is plain data ([`Info`], [`Frame`], [`AudioBlock`], [`Error`]) so
+//! the crate knows nothing about the rest of LightCraft.
 //!
 //! A video is never read whole: [`Video::open`] reads the file's headers through a
 //! [`ByteSource`] (a `File`, or bytes in memory), and frames read their samples as they decode.
@@ -23,11 +24,13 @@ use std::sync::Arc;
 pub use filmcraft_isobmff::ByteSource;
 use filmcraft_isobmff::{CodecConfig, Mp4File, Track, TrackKind};
 
+mod audio;
 mod boxes;
 mod convert;
 #[cfg(feature = "testkit")]
 pub mod testkit;
 
+pub use audio::{AudioBlock, AudioCodec, AudioInfo, AudioReader};
 use convert::{Samples, Yuv};
 
 /// Neither side of a picture may exceed this, nor their product [`MAX_PIXELS`] (8K is 7680 x 4320).
@@ -123,6 +126,8 @@ pub struct Info {
     /// This build can decode the picture ([`Video::reader`] works).
     pub playable: bool,
     pub has_audio: bool,
+    /// The sound track, when there is one.
+    pub audio: Option<AudioInfo>,
     /// When it was recorded, `YYYY-MM-DDTHH:MM:SS`: local time when the camera wrote one,
     /// otherwise the container's creation time (UTC).
     pub created: Option<String>,
@@ -151,6 +156,8 @@ struct Inner {
     track: usize,
     info: Info,
     preview: Option<(u64, u64)>,
+    /// Index of the sound track in `file.tracks`, and what it holds.
+    audio: Option<(usize, AudioInfo)>,
 }
 
 /// An opened video file. Cheap to clone; readers keep it alive.
@@ -229,6 +236,7 @@ impl Video {
                 meta(&["com.apple.quicktime.creationdate", "©day"]).and_then(recorded).or_else(|| boxes::created(&*source).and_then(boxes::iso));
             let codec = codec_of(t);
             let preview = boxes::preview(&*source);
+            let audio = audio::describe(&file);
             let info = Info {
                 width,
                 height,
@@ -239,12 +247,13 @@ impl Video {
                 playable: playable(&codec),
                 codec,
                 has_audio: file.tracks.iter().any(|t| t.kind == TrackKind::Audio),
+                audio: audio.as_ref().map(|(_, info)| info.clone()),
                 created,
                 make: meta(&["com.apple.quicktime.make", "©mak"]).map(str::to_string),
                 model: meta(&["com.apple.quicktime.model", "©mod"]).map(str::to_string),
                 has_preview: preview.is_some(),
             };
-            Ok(Video { inner: Arc::new(Inner { source: source.clone(), file, track, info, preview }) })
+            Ok(Video { inner: Arc::new(Inner { source: source.clone(), file, track, info, preview, audio }) })
         })
     }
 
@@ -271,6 +280,12 @@ impl Video {
     /// The frames of the video, from its start.
     pub fn reader(&self) -> Result<Reader> {
         Reader::new(self.inner.clone())
+    }
+
+    /// The sound of the video, from its start. An error when there is none, or none this build
+    /// can decode ([`AudioInfo::playable`]).
+    pub fn audio_reader(&self) -> Result<AudioReader> {
+        AudioReader::new(self.inner.clone())
     }
 
     /// The first picture of the video, its long edge reduced towards `max_edge` when given.
@@ -590,7 +605,7 @@ fn track(video: &Inner) -> Result<&Track> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::testkit::{Clip, clip, grey};
+    use crate::testkit::{Clip, Sound, clip, grey, sound_at};
 
     fn small() -> Clip {
         Clip { width: 64, height: 48, frames: 12, fps: 24, keyint: 5, ..Clip::default() }
@@ -840,7 +855,7 @@ mod tests {
 
     #[test]
     fn damaged_motion_jpeg_files_are_errors_never_panics() {
-        let good = clip(&Clip { sound: true, ..motion_jpeg() }).unwrap();
+        let good = clip(&Clip { sound: Some(Sound::Pcm8), ..motion_jpeg() }).unwrap();
         let play = |bytes: Vec<u8>| {
             if let Ok(video) = Video::open(bytes)
                 && let Ok(mut reader) = video.reader()
@@ -873,7 +888,7 @@ mod tests {
     /// sample entry"), so it could not even be imported.
     #[test]
     fn a_clip_with_raw_8_bit_sound_opens_and_plays() {
-        for clip_ in [Clip { sound: true, ..motion_jpeg() }, Clip { sound: true, quicktime: true, ..small() }] {
+        for clip_ in [Clip { sound: Some(Sound::Pcm8), ..motion_jpeg() }, Clip { sound: Some(Sound::Pcm8), quicktime: true, ..small() }] {
             let bytes = clip(&clip_).unwrap();
             assert!(bytes.windows(4).any(|w| w == b"raw "), "the sound is stored as `raw `");
             assert!(filmcraft_isobmff::open(&bytes).is_err(), "the demuxer alone still refuses it: the workaround is needed");
@@ -889,8 +904,175 @@ mod tests {
             assert_eq!(frames, 12);
         }
         // the same sound in a file that never needed help is left alone
-        let video = Video::open(clip(&Clip { sound: true, ..small() }).unwrap()).unwrap();
+        let video = Video::open(clip(&Clip { sound: Some(Sound::Pcm8), ..small() }).unwrap()).unwrap();
         assert!(video.info().has_audio);
+    }
+
+    /// Every sample of a clip's sound, with the time of the first one.
+    fn all_sound(video: &Video) -> (Vec<f32>, f64) {
+        let mut reader = video.audio_reader().unwrap();
+        let (rate, channels) = (f64::from(reader.sample_rate()), reader.channels());
+        let (mut samples, mut start) = (Vec::new(), None);
+        while let Some(block) = reader.next_block().unwrap() {
+            assert_eq!(block.samples.len() % channels, 0);
+            let expected = *start.get_or_insert(block.time) + (samples.len() / channels) as f64 / rate;
+            assert!((block.time - expected).abs() < 0.5 / rate, "blocks follow each other: {} for {expected}", block.time);
+            samples.extend(block.samples);
+        }
+        (samples, start.unwrap())
+    }
+
+    /// How loud `samples` are (root mean square) on one channel between two times.
+    fn loudness(samples: &[f32], sound: Sound, channel: usize, from: f64, to: f64) -> f32 {
+        let (rate, channels) = (f64::from(sound.rate()), sound.channels());
+        let frames = &samples[(from * rate) as usize * channels..(to * rate) as usize * channels];
+        let values: Vec<f32> = frames.chunks(channels).map(|f| f[channel]).collect();
+        (values.iter().map(|v| v * v).sum::<f32>() / values.len() as f32).sqrt()
+    }
+
+    /// A video's sound was only reported as present. Its track is described, and its samples
+    /// come out in order at the right times: silence, then the tone, in every format.
+    #[test]
+    fn the_sound_of_a_clip_is_described_and_read_in_order() {
+        for sound in [Sound::Pcm8, Sound::Pcm16, Sound::Aac] {
+            for quicktime in [false, true] {
+                let video = Video::open(clip(&Clip { sound: Some(sound), quicktime, ..small() }).unwrap()).unwrap();
+                let info = video.info().audio.clone().unwrap();
+                let codec = if sound == Sound::Aac { AudioCodec::Aac } else { AudioCodec::Pcm };
+                assert_eq!(
+                    (info.codec.clone(), info.sample_rate, usize::from(info.channels), info.playable),
+                    (codec, sound.rate(), sound.channels(), true)
+                );
+                assert!((info.duration - 0.5).abs() < 0.05, "{sound:?}: {}", info.duration);
+                assert!(video.info().has_audio);
+                let (samples, start) = all_sound(&video);
+                let (rate, channels) = (f64::from(sound.rate()), sound.channels());
+                assert!(start.abs() < 1.0 / rate, "{sound:?}: the sound starts with the picture, not {start}");
+                let frames = samples.len() / channels;
+                assert!((frames as f64 / rate - 0.5).abs() < 0.05, "{sound:?}: {frames} frames");
+                if sound == Sound::Aac {
+                    // lossy: the silence is quiet, the tone is there, the right channel at half its level
+                    assert!(loudness(&samples, sound, 0, 0.02, 0.2) < 0.01, "{}", loudness(&samples, sound, 0, 0.02, 0.2));
+                    let (left, right) = (loudness(&samples, sound, 0, 0.3, 0.45), loudness(&samples, sound, 1, 0.3, 0.45));
+                    assert!((left - 0.3536).abs() < 0.03 && (right - 0.1768).abs() < 0.02, "left {left}, right {right}");
+                } else {
+                    let step = if sound == Sound::Pcm8 { 1.0 / 127.0 } else { 1.0 / 32_000.0 };
+                    for (i, frame) in samples.chunks(channels).enumerate() {
+                        let want = sound_at(i as f64 / rate);
+                        assert!((frame[0] - want).abs() <= step, "{sound:?} frame {i}: {} for {want}", frame[0]);
+                        if channels == 2 {
+                            assert!((frame[1] - want * 0.5).abs() <= step, "{sound:?} frame {i}, right");
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn seeking_the_sound_lands_on_the_sample_heard_then() {
+        for sound in [Sound::Pcm8, Sound::Pcm16, Sound::Aac] {
+            let video = Video::open(clip(&Clip { sound: Some(sound), ..small() }).unwrap()).unwrap();
+            let mut reader = video.audio_reader().unwrap();
+            let (rate, channels) = (f64::from(sound.rate()), sound.channels());
+            for target in [0.3012, 0.1, 0.0, 0.26] {
+                reader.seek(target).unwrap();
+                let block = reader.next_block().unwrap().unwrap();
+                assert!((block.time - target).abs() <= 1.0 / rate, "{sound:?}: sought {target}, got {}", block.time);
+                // enough of it to judge: the rest of that tenth of a second
+                let mut samples = block.samples;
+                while samples.len() < (0.04 * rate) as usize * channels {
+                    samples.extend(reader.next_block().unwrap().unwrap().samples);
+                }
+                if sound == Sound::Aac {
+                    let heard =
+                        (samples.chunks(channels).take((0.04 * rate) as usize).map(|f| f[0] * f[0]).sum::<f32>() / (0.04 * rate as f32)).sqrt();
+                    assert_eq!(heard > 0.2, target > 0.25, "{sound:?} at {target}: {heard}");
+                } else {
+                    let step = if sound == Sound::Pcm8 { 1.0 / 127.0 } else { 1.0 / 32_000.0 };
+                    for (i, frame) in samples.chunks(channels).take(200).enumerate() {
+                        let want = sound_at(block.time + i as f64 / rate);
+                        assert!((frame[0] - want).abs() <= step, "{sound:?} at {target}, frame {i}: {} for {want}", frame[0]);
+                    }
+                }
+            }
+            // past the end there is nothing; odd times are clamped, never an error
+            reader.seek(1e9).unwrap();
+            let rest: usize = std::iter::from_fn(|| reader.next_block().unwrap()).map(|b| b.samples.len()).sum();
+            assert!(rest <= 2048 * channels, "{sound:?}: {rest}");
+            for odd in [-5.0, f64::NAN, f64::INFINITY] {
+                reader.seek(odd).unwrap();
+                assert!(reader.next_block().unwrap().is_some());
+            }
+        }
+    }
+
+    #[test]
+    fn a_clip_without_sound_or_with_sound_nothing_reads_says_so() {
+        let video = Video::open(clip(&small()).unwrap()).unwrap();
+        assert_eq!((video.info().audio.clone(), video.info().has_audio), (None, false));
+        assert_eq!(video.audio_reader().err(), Some(Error::Unsupported("the video has no sound".into())));
+        // a format without a decoder here: named, not playable, and the picture still plays
+        let mut bytes = clip(&Clip { sound: Some(Sound::Pcm16), quicktime: true, ..small() }).unwrap();
+        let moov = bytes.windows(4).position(|w| w == b"moov").unwrap();
+        let entry = moov + bytes[moov..].windows(4).position(|w| w == b"twos").unwrap();
+        bytes[entry..entry + 4].copy_from_slice(b"ulaw");
+        let video = Video::open(bytes).unwrap();
+        let info = video.info().audio.clone().unwrap();
+        assert_eq!((info.codec, info.playable, info.sample_rate, info.channels), (AudioCodec::Other("ulaw".into()), false, 48_000, 2));
+        assert_eq!(video.audio_reader().err(), Some(Error::Unsupported("no decoder for ulaw sound".into())));
+        assert!(video.poster_frame(None).is_ok());
+    }
+
+    /// A damaged packet of sound is silence for its length; the rest plays, at the right times.
+    #[test]
+    fn a_damaged_packet_of_sound_is_silence_not_the_end() {
+        let mut bytes = clip(&Clip { sound: Some(Sound::Aac), ..small() }).unwrap();
+        let file = filmcraft_isobmff::open(bytes.clone()).unwrap();
+        let track = file.tracks.iter().find(|t| t.kind == TrackKind::Audio).unwrap();
+        // the packets of the tone from 0.32 s to 0.38 s
+        for sample in &track.samples[16..19] {
+            bytes[sample.offset as usize..][..sample.size as usize].fill(0xff);
+        }
+        let video = Video::open(bytes).unwrap();
+        let (samples, _) = all_sound(&video);
+        assert!((samples.len() as f64 / 2.0 / 48_000.0 - 0.5).abs() < 0.05, "nothing is lost: {}", samples.len());
+        assert!(loudness(&samples, Sound::Aac, 0, 0.33, 0.36) < 0.01, "the damaged part is silent");
+        assert!(loudness(&samples, Sound::Aac, 0, 0.42, 0.47) > 0.3, "and the tone comes back");
+        assert!(samples.iter().all(|v| v.is_finite() && v.abs() <= 1.0));
+    }
+
+    #[test]
+    fn damaged_sound_is_an_error_or_silence_never_a_panic() {
+        for sound in [Sound::Pcm8, Sound::Pcm16, Sound::Aac] {
+            let good = clip(&Clip { sound: Some(sound), quicktime: sound == Sound::Pcm8, ..small() }).unwrap();
+            let listen = |bytes: Vec<u8>| {
+                if let Ok(video) = Video::open(bytes)
+                    && let Ok(mut reader) = video.audio_reader()
+                {
+                    let _ = reader.seek(0.2);
+                    for _ in 0..64 {
+                        match reader.next_block() {
+                            Ok(Some(block)) => assert!(block.samples.iter().all(|v| v.is_finite() && v.abs() <= 1.0)),
+                            _ => break,
+                        }
+                    }
+                }
+            };
+            for cut in (0..good.len()).step_by(good.len() / 61 + 1) {
+                listen(good[..cut].to_vec());
+            }
+            let mut seed = 0x0bad_5eedu32;
+            for round in 0..200 {
+                let mut bad = good.clone();
+                for _ in 0..=(round % 4) {
+                    seed = seed.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+                    let at = seed as usize % bad.len();
+                    bad[at] = (seed >> 24) as u8;
+                }
+                listen(bad);
+            }
+        }
     }
 
     /// Interlaced Motion JPEG (`mjpa`, `mjpb`) is named, and refused with a reason.
@@ -903,6 +1085,22 @@ mod tests {
         let video = Video::open(bytes).unwrap();
         assert_eq!((video.info().codec.clone(), video.info().playable), (Codec::Other("mjpa".into()), false));
         assert_eq!(video.reader().err(), Some(Error::Unsupported("no decoder for mjpa video".into())));
+    }
+
+    /// Write clips to try in the app: `LC_VIDEO_CLIPS=<folder> cargo test -p lightcraft-video sample_clips`.
+    #[test]
+    fn sample_clips_are_written_on_request() {
+        let Some(dir) = std::env::var_os("LC_VIDEO_CLIPS") else { return };
+        let long = Clip { width: 320, height: 240, frames: 120, fps: 24, keyint: 24, ..Clip::default() };
+        let clips = [
+            ("h264-aac.mp4", Clip { sound: Some(Sound::Aac), ..long.clone() }),
+            ("h264-pcm16.mov", Clip { sound: Some(Sound::Pcm16), quicktime: true, ..long.clone() }),
+            ("mjpeg-pcm8.mov", Clip { sound: Some(Sound::Pcm8), quicktime: true, motion_jpeg: true, ..long.clone() }),
+            ("h264-silent.mp4", long),
+        ];
+        for (name, c) in clips {
+            std::fs::write(std::path::Path::new(&dir).join(name), clip(&c).unwrap()).unwrap();
+        }
     }
 
     /// Open and decode a real file: `LC_VIDEO_FILE=<path> cargo test -p lightcraft-video real_file -- --nocapture`.
@@ -919,6 +1117,16 @@ mod tests {
         }
         println!("{frames} of {} frames, {:.1} ms a frame", video.info().frames, started.elapsed().as_secs_f64() * 1e3 / frames.max(1) as f64);
         assert!(frames > 0);
+        if video.info().audio.as_ref().is_some_and(|a| a.playable) {
+            let mut reader = video.audio_reader().unwrap();
+            let (started, mut samples, mut peak) = (std::time::Instant::now(), 0usize, 0.0f32);
+            while let Some(block) = reader.next_block().unwrap() {
+                samples += block.samples.len();
+                peak = block.samples.iter().fold(peak, |p, v| p.max(v.abs()));
+            }
+            let seconds = samples as f64 / reader.channels() as f64 / f64::from(reader.sample_rate());
+            println!("sound: {seconds:.2} s, peak {peak:.3}, decoded in {:.0} ms", started.elapsed().as_secs_f64() * 1e3);
+        }
     }
 
     #[cfg(not(feature = "hevc"))]

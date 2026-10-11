@@ -1,5 +1,6 @@
 //! Generated test clips (feature `testkit`, for tests only): LightCraft never commits media, so
-//! tests here and in the crates above encode a few small frames and wrap them in an MP4.
+//! tests here and in the crates above encode a few small frames (H.264, or JPEG pictures for a
+//! Motion JPEG clip) and wrap them in an MP4.
 //!
 //! Every frame is plain grey, a little brighter than the one before ([`grey`]), with the stored
 //! picture's top left quarter tinted red: a test can tell which frame it got and which way up.
@@ -7,7 +8,7 @@
 use std::io::Cursor;
 
 use filmcraft_h264enc::{Encoder, EncoderConfig, PacketFormat, Profile, RateControl, YuvFrame};
-use filmcraft_isobmff::{AvcConfig, Brand, HevcConfig, Mp4Writer, SampleEntry, TrackConfig, WriteSample, WriterOptions};
+use filmcraft_isobmff::{AvcConfig, Brand, HevcConfig, Mp4Writer, PcmConfig, SampleEntry, TrackConfig, WriteSample, WriterOptions};
 
 /// What [`clip`] makes.
 #[derive(Debug, Clone)]
@@ -25,11 +26,16 @@ pub struct Clip {
     pub cover: Option<Vec<u8>>,
     /// A QuickTime `.mov` instead of an `.mp4`.
     pub quicktime: bool,
+    /// Motion JPEG (every frame a JPEG picture, all of them key frames) instead of H.264.
+    pub motion_jpeg: bool,
+    /// A second track of sound: 8-bit PCM at 8 kHz, a steady tone. In a QuickTime file it is
+    /// stored under the code `raw `, as older cameras did.
+    pub sound: bool,
 }
 
 impl Default for Clip {
     fn default() -> Self {
-        Clip { width: 64, height: 48, frames: 12, fps: 24, keyint: 5, rotation: 0, cover: None, quicktime: false }
+        Clip { width: 64, height: 48, frames: 12, fps: 24, keyint: 5, rotation: 0, cover: None, quicktime: false, motion_jpeg: false, sound: false }
     }
 }
 
@@ -103,12 +109,11 @@ fn rotate_track(bytes: &mut [u8], rotation: u8) -> Result<(), String> {
     Ok(())
 }
 
-/// An H.264 video of `c.frames` frames in an MP4 (or QuickTime) file.
-pub fn clip(c: &Clip) -> Result<Vec<u8>, String> {
+type Writer = Mp4Writer<Cursor<Vec<u8>>>;
+
+/// The clip's frames as an H.264 track.
+fn h264_track(c: &Clip, writer: &mut Writer) -> Result<(), String> {
     let (w, h) = (c.width as usize, c.height as usize);
-    if w < 16 || h < 16 || w % 2 != 0 || h % 2 != 0 || c.fps == 0 || c.frames == 0 {
-        return Err("a clip needs an even size of at least 16 x 16, a frame rate and a frame".into());
-    }
     let mut config = EncoderConfig::new(c.width, c.height, c.fps, 1);
     config.profile = Profile::Main;
     config.rate = RateControl::Qp(18);
@@ -132,8 +137,6 @@ pub fn clip(c: &Clip) -> Result<Vec<u8>, String> {
     }
     packets.extend(encoder.flush());
 
-    let brand = if c.quicktime { Brand::Mov } else { Brand::Mp4 };
-    let mut writer = Mp4Writer::new(Cursor::new(Vec::new()), WriterOptions::new(brand)).map_err(|e| e.to_string())?;
     let avcc = AvcConfig::parse(&encoder.avcc()).map_err(|e| e.to_string())?;
     let entry = SampleEntry::avc(avcc, c.width as u16, c.height as u16);
     let track = writer.add_track(TrackConfig::new(entry, c.fps * TICKS)).map_err(|e| e.to_string())?;
@@ -141,6 +144,63 @@ pub fn clip(c: &Clip) -> Result<Vec<u8>, String> {
         let offset = i32::try_from((p.pts - p.dts) * i64::from(TICKS)).map_err(|_| "composition offset")?;
         let sample = WriteSample { data: &p.data, duration: TICKS, composition_offset: offset, is_sync: p.keyframe };
         writer.write_sample(track, sample).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+/// The clip's frames as a Motion JPEG track: one JPEG picture a sample.
+fn jpeg_track(c: &Clip, writer: &mut Writer) -> Result<(), String> {
+    let (w, h) = (c.width as usize, c.height as usize);
+    let (width, height) = (u16::try_from(c.width).map_err(|_| "clip width")?, u16::try_from(c.height).map_err(|_| "clip height")?);
+    let track = writer.add_track(TrackConfig::new(SampleEntry::jpeg(width, height), c.fps * TICKS)).map_err(|e| e.to_string())?;
+    for i in 0..c.frames {
+        let level = grey(i).clamp(0, 255) as u8;
+        let mut rgb = vec![level; w * h * 3];
+        for row in 0..h / 2 {
+            for px in rgb.get_mut(row * w * 3..(row * w + w / 2) * 3).ok_or("picture")?.as_chunks_mut::<3>().0 {
+                *px = [230, 30, 30];
+            }
+        }
+        let mut data = Vec::new();
+        jpeg_encoder::Encoder::new(&mut data, 92).encode(&rgb, width, height, jpeg_encoder::ColorType::Rgb).map_err(|e| e.to_string())?;
+        let sample = WriteSample { data: &data, duration: TICKS, composition_offset: 0, is_sync: true };
+        writer.write_sample(track, sample).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+/// Samples a second of the clip's sound.
+const SOUND_RATE: u32 = 8000;
+
+/// The clip's sound: as long as its picture, 8-bit PCM, one channel.
+fn sound_track(c: &Clip, writer: &mut Writer) -> Result<(), String> {
+    let config = PcmConfig { bits: 8, float: false, big_endian: true, signed: false, channels: 1, sample_rate: f64::from(SOUND_RATE) };
+    let track = writer.add_track(TrackConfig::new(SampleEntry::pcm(config), SOUND_RATE)).map_err(|e| e.to_string())?;
+    let samples = u64::from(c.frames) * u64::from(SOUND_RATE) / u64::from(c.fps);
+    // a 500 Hz square wave around the middle (8-bit sound is unsigned)
+    let data: Vec<u8> = (0..samples).map(|i| if (i / 8) % 2 == 0 { 160 } else { 96 }).collect();
+    for block in data.chunks(1024) {
+        let sample = WriteSample { data: block, duration: block.len() as u32, composition_offset: 0, is_sync: true };
+        writer.write_sample(track, sample).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+/// A video of `c.frames` frames (H.264, or Motion JPEG) in an MP4 (or QuickTime) file.
+pub fn clip(c: &Clip) -> Result<Vec<u8>, String> {
+    let (w, h) = (c.width as usize, c.height as usize);
+    if w < 16 || h < 16 || w % 2 != 0 || h % 2 != 0 || c.fps == 0 || c.frames == 0 {
+        return Err("a clip needs an even size of at least 16 x 16, a frame rate and a frame".into());
+    }
+    let brand = if c.quicktime { Brand::Mov } else { Brand::Mp4 };
+    let mut writer = Mp4Writer::new(Cursor::new(Vec::new()), WriterOptions::new(brand)).map_err(|e| e.to_string())?;
+    if c.motion_jpeg {
+        jpeg_track(c, &mut writer)?;
+    } else {
+        h264_track(c, &mut writer)?;
+    }
+    if c.sound {
+        sound_track(c, &mut writer)?;
     }
     let mut bytes = writer.finish().map_err(|e| e.to_string())?.into_inner();
     if !c.rotation.is_multiple_of(4) {

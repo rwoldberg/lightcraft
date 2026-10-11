@@ -1,5 +1,5 @@
-//! The few boxes the demuxer does not surface: an embedded preview image and the movie's
-//! creation time. Only box headers are read, each level is bounded, and every offset is checked
+//! The few boxes the demuxer does not surface (an embedded preview image and the movie's
+//! creation time), and one it misreads ([`raw_sound_entries`]). Only box headers are read, each level is bounded, and every offset is checked
 //! against its parent: a malformed file yields `None`, never a panic or a large read.
 
 use filmcraft_isobmff::ByteSource;
@@ -48,6 +48,80 @@ fn find(src: &dyn ByteSource, within: Span, kind: &[u8; 4]) -> Option<Span> {
         at = end;
     }
     None
+}
+
+/// Every box directly inside `within`, as (type, payload), up to the first one that is damaged.
+fn children(src: &dyn ByteSource, within: Span) -> Vec<([u8; 4], Span)> {
+    let mut found = Vec::new();
+    let mut at = within.start;
+    for _ in 0..MAX_BOXES {
+        let Some(head) = read::<8>(src, at, within.end) else { break };
+        let kind = [head[4], head[5], head[6], head[7]];
+        // the same box again, by its own type: its payload span
+        let Some(span) = find(src, Span { start: at, end: within.end }, &kind) else { break };
+        found.push((kind, span));
+        at = span.end;
+    }
+    found
+}
+
+/// Sound tracks looked at, and sample descriptions per track, in [`raw_sound_entries`].
+const MAX_SOUND: usize = 64;
+
+/// Where the file names a sound format `raw ` (QuickTime's 8-bit PCM, what older cameras
+/// recorded): the offset of each such code in a sound track's sample descriptions.
+///
+/// The demuxer reads `raw ` as uncompressed *video* whatever the track, runs off the end of the
+/// shorter sound description and refuses the whole file. [`Renamed`] shows it those codes as
+/// `NONE`, QuickTime's other name for the same format, which it reads as sound.
+pub(crate) fn raw_sound_entries(src: &dyn ByteSource) -> Vec<u64> {
+    let file = Span { start: 0, end: src.len() };
+    let Some(moov) = find(src, file, b"moov") else { return Vec::new() };
+    let mut found = Vec::new();
+    for (_, trak) in children(src, moov).into_iter().filter(|(kind, _)| kind == b"trak").take(MAX_SOUND) {
+        let Some(mdia) = find(src, trak, b"mdia") else { continue };
+        // a handler box: version and flags, component type, then the kind of track
+        let handler = find(src, mdia, b"hdlr").and_then(|hdlr| read::<4>(src, hdlr.start.checked_add(8)?, hdlr.end));
+        if handler != Some(*b"soun") {
+            continue;
+        }
+        let Some(stsd) = path(src, mdia, &[b"minf", b"stbl", b"stsd"]) else { continue };
+        // version and flags, and the number of descriptions, come before the descriptions
+        let Some(start) = stsd.start.checked_add(8).filter(|start| *start <= stsd.end) else { continue };
+        let mut at = start;
+        for (kind, entry) in children(src, Span { start, end: stsd.end }).into_iter().take(MAX_SOUND) {
+            if kind == *b"raw " {
+                found.push(at.saturating_add(4));
+            }
+            at = entry.end;
+        }
+    }
+    found
+}
+
+/// A file with the sound format codes at `at` (see [`raw_sound_entries`]) reading `NONE`.
+pub(crate) struct Renamed<S> {
+    pub inner: S,
+    pub at: Vec<u64>,
+}
+
+impl<S: std::ops::Deref<Target: ByteSource>> ByteSource for Renamed<S> {
+    fn len(&self) -> u64 {
+        self.inner.len()
+    }
+
+    fn read_at(&self, offset: u64, buf: &mut [u8]) -> std::io::Result<()> {
+        self.inner.read_at(offset, buf)?;
+        for code in &self.at {
+            for (i, byte) in b"NONE".iter().enumerate() {
+                let slot = code.checked_add(i as u64).and_then(|at| at.checked_sub(offset)).and_then(|at| buf.get_mut(usize::try_from(at).ok()?));
+                if let Some(slot) = slot {
+                    *slot = *byte;
+                }
+            }
+        }
+        Ok(())
+    }
 }
 
 fn path(src: &dyn ByteSource, mut within: Span, kinds: &[&[u8; 4]]) -> Option<Span> {

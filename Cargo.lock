@@ -3411,7 +3411,10 @@ dependencies = [
  "filmcraft-h264enc",
  "filmcraft-hevc",
  "filmcraft-isobmff",
+ "jpeg-encoder",
  "lightcraft-video",
+ "zune-core",
+ "zune-jpeg",
 ]
 
 [[package]]

@@ -31,11 +31,15 @@ fn shot(h: &mut Headless, name: &str) {
 
 /// A session with one 3-second clip (160 x 120, 12 frames a second) and one still, in Detail on the clip.
 fn clip_in_detail(tag: &str) -> (Headless, PhotoId, PhotoId, std::path::PathBuf) {
+    this_clip_in_detail(tag, "clip.mp4", &Clip { width: 160, height: 120, frames: 36, fps: 12, keyint: 12, ..Clip::default() })
+}
+
+/// [`clip_in_detail`] for a clip of the caller's making.
+fn this_clip_in_detail(tag: &str, name: &str, video: &Clip) -> (Headless, PhotoId, PhotoId, std::path::PathBuf) {
     let dir = std::env::temp_dir().join(format!("lc-ui-video-{tag}-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
-    std::fs::write(dir.join("clip.mp4"), clip(&Clip { width: 160, height: 120, frames: 36, fps: 12, keyint: 12, ..Clip::default() }).unwrap())
-        .unwrap();
+    std::fs::write(dir.join(name), clip(video).unwrap()).unwrap();
     let still = lightcraft_raster::Rgba8::from_fn(120, 80, |x, y| [(x * 2) as u8, (y * 3) as u8, 90, 255]);
     let o = lightcraft_engine::export::ExportOptions { format: lightcraft_engine::export::ExportFormat::Png, ..Default::default() };
     std::fs::write(dir.join("still.png"), lightcraft_engine::export::encode_image(&still, &o).unwrap()).unwrap();
@@ -121,6 +125,31 @@ fn a_video_plays_pauses_seeks_and_steps_in_the_loupe() {
     assert!(h.app.run("video.seek", json!({})).is_err());
     assert!(h.app.run("video.step", json!({"frames": i64::MAX})).is_ok());
     assert!(h.app.run("video.nonsense", json!({})).is_err());
+    h.settle(SETTLE);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// A clip from an older digital camera (Motion JPEG with 8-bit `raw ` sound) had no player: it
+/// could not be opened at all. It plays, seeks and steps like any other, backwards too (every
+/// frame is a key frame).
+#[test]
+fn a_motion_jpeg_clip_plays_in_the_loupe() {
+    let old = Clip { width: 160, height: 120, frames: 36, fps: 12, motion_jpeg: true, quicktime: true, sound: true, ..Clip::default() };
+    let (mut h, video, _, dir) = this_clip_in_detail("mjpeg", "P8250039.MOV", &old);
+    assert_eq!(widget_ids(&mut h, "video:play"), vec!["video:play".to_string()]);
+    shot(&mut h, "mjpeg-poster.png");
+    let r = h.app.run("video.playPause", json!({})).unwrap();
+    assert_eq!((r["playing"].as_bool(), r["photo"].as_u64()), (Some(true), Some(video.0)), "{r}");
+    assert!(h.step_until(SETTLE, |h| position(h) > 0.5), "it plays: {}", status(&h));
+    assert_eq!(status(&h)["error"], Value::Null, "{}", status(&h));
+    shot(&mut h, "mjpeg-playing.png");
+    h.app.run("video.seek", json!({"seconds": 2.26})).unwrap();
+    assert!(h.step_until(SETTLE, |h| (position(h) - 27.0 / 12.0).abs() < 1e-6), "frame 27 covers 2.26 s: {}", status(&h));
+    h.app.run("video.step", json!({"frames": -2})).unwrap();
+    assert!(h.step_until(SETTLE, |h| (position(h) - 25.0 / 12.0).abs() < 1e-6), "{}", status(&h));
+    h.app.run("video.play", json!({})).unwrap();
+    assert!(h.step_until(SETTLE, |h| status(h)["ended"] == true), "{}", status(&h));
+    assert!((position(&h) - 35.0 / 12.0).abs() < 1e-6, "the last frame: {}", status(&h));
     h.settle(SETTLE);
     let _ = std::fs::remove_dir_all(&dir);
 }

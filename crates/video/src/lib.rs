@@ -2,8 +2,9 @@
 //! poster image, and its frames.
 //!
 //! A thin wrapper around FilmCraft's clean-room, pure-Rust demuxer (`filmcraft-isobmff`) and
-//! decoders (`filmcraft-h264`, and `filmcraft-hevc` behind the `hevc` feature). Its API is plain
-//! data ([`Info`], [`Frame`], [`Error`]) so the crate knows nothing about the rest of LightCraft.
+//! decoders (`filmcraft-h264`, and `filmcraft-hevc` behind the `hevc` feature), with `zune-jpeg`
+//! for Motion JPEG (what older digital cameras recorded). Its API is plain data ([`Info`],
+//! [`Frame`], [`Error`]) so the crate knows nothing about the rest of LightCraft.
 //!
 //! A video is never read whole: [`Video::open`] reads the file's headers through a
 //! [`ByteSource`] (a `File`, or bytes in memory), and frames read their samples as they decode.
@@ -87,7 +88,9 @@ pub enum Codec {
     H264,
     /// H.265: decoded only in builds with the `hevc` feature.
     Hevc,
-    /// Anything else, by its sample-entry code (`apch`, `av01`, `jpeg`…): no decoder here.
+    /// Every frame is a JPEG picture (sample entry `jpeg`): older digital cameras.
+    MotionJpeg,
+    /// Anything else, by its sample-entry code (`apch`, `av01`, `mjpa`…): no decoder here.
     Other(String),
 }
 
@@ -97,6 +100,7 @@ impl Codec {
         match self {
             Codec::H264 => "H.264",
             Codec::Hevc => "HEVC",
+            Codec::MotionJpeg => "Motion JPEG",
             Codec::Other(code) => code,
         }
     }
@@ -159,13 +163,15 @@ fn codec_of(track: &Track) -> Codec {
     match track.codec() {
         Some(CodecConfig::Avc(_)) => Codec::H264,
         Some(CodecConfig::Hevc(_)) => Codec::Hevc,
+        // `mjpa` / `mjpb` are interlaced (two fields a sample, `mjpb` without JPEG markers): not read
+        Some(CodecConfig::Jpeg { fourcc }) if &fourcc.0 == b"jpeg" => Codec::MotionJpeg,
         _ => Codec::Other(track.entries.first().map(|e| e.format.to_string_lossy()).unwrap_or_default().trim().to_string()),
     }
 }
 
 fn playable(codec: &Codec) -> bool {
     match codec {
-        Codec::H264 => true,
+        Codec::H264 | Codec::MotionJpeg => true,
         Codec::Hevc => cfg!(feature = "hevc"),
         Codec::Other(_) => false,
     }
@@ -190,6 +196,9 @@ impl Video {
     /// Read the headers of the video in `source`.
     pub fn open(source: impl ByteSource + Send + Sync + 'static) -> Result<Self> {
         let source: Source = Arc::new(source);
+        // 8-bit sound under the code the demuxer mistakes for video: shown to it under its other name
+        let renamed = boxes::raw_sound_entries(&*source);
+        let source: Source = if renamed.is_empty() { source } else { Arc::new(boxes::Renamed { inner: source, at: renamed }) };
         guard("reading the video", || {
             let file = filmcraft_isobmff::open(&*source)?;
             let track = file
@@ -276,6 +285,8 @@ enum Decoder {
     H264(Box<filmcraft_h264::Decoder>),
     #[cfg(feature = "hevc")]
     Hevc(Box<filmcraft_hevc::Decoder>),
+    /// Motion JPEG: every sample is a picture by itself, so there is nothing to keep between them.
+    Jpeg,
 }
 
 fn decoder(track: &Track) -> Result<Decoder> {
@@ -289,6 +300,7 @@ fn decoder(track: &Track) -> Result<Decoder> {
         }
         #[cfg(not(feature = "hevc"))]
         Some(CodecConfig::Hevc(_)) => Err(Error::Unsupported("HEVC video isn't included in this build".into())),
+        Some(CodecConfig::Jpeg { .. }) if codec_of(track) == Codec::MotionJpeg => Ok(Decoder::Jpeg),
         _ => Err(Error::Unsupported(format!("no decoder for {} video", codec_of(track).name()))),
     }
 }
@@ -330,12 +342,35 @@ fn checked(width: u32, height: u32) -> Result<()> {
     Ok(())
 }
 
+/// One Motion JPEG sample → its picture.
+fn jpeg_picture(data: &[u8], pts: i64, rotation: u8, max_edge: Option<u32>) -> Result<Picture> {
+    use zune_core::colorspace::ColorSpace;
+    use zune_core::options::DecoderOptions;
+    let side = MAX_SIDE as usize;
+    let options = DecoderOptions::default().set_max_width(side).set_max_height(side).set_strict_mode(false).jpeg_set_out_colorspace(ColorSpace::RGB);
+    let mut decoder = zune_jpeg::JpegDecoder::new_with_options(zune_core::bytestream::ZCursor::new(data), options);
+    let malformed = |e: zune_jpeg::errors::DecodeErrors| Error::Malformed(format!("a frame of the video: {e}"));
+    // the size is checked before the picture is allocated
+    decoder.decode_headers().map_err(malformed)?;
+    let info = decoder.info().ok_or_else(|| Error::Malformed("a frame of the video has no size".into()))?;
+    let (width, height) = (u32::from(info.width), u32::from(info.height));
+    checked(width, height)?;
+    let pixels = decoder.decode().map_err(malformed)?;
+    let channels = pixels.len() / (width as usize * height as usize);
+    if !matches!(channels, 1 | 3 | 4) {
+        return Err(Error::Malformed("a frame of the video is incomplete".into()));
+    }
+    let (width, height, rgba) = convert::packed_to_rgba(&pixels, channels, width, height, rotation, divisor(width, height, max_edge));
+    Ok(Picture { pts, width, height, rgba })
+}
+
 impl Decoder {
     fn set_draft(&mut self, on: bool) {
         match self {
             Decoder::H264(d) => d.set_draft(on),
             #[cfg(feature = "hevc")]
             Decoder::Hevc(d) => d.set_draft(on),
+            Decoder::Jpeg => {}
         }
     }
 
@@ -405,6 +440,12 @@ impl Decoder {
                     })
                     .collect()
             }
+            Decoder::Jpeg => match sample.map(|(data, pts)| jpeg_picture(data, pts, rotation, max_edge)) {
+                Some(Ok(picture)) => Ok(vec![picture]),
+                // frames don't depend on each other: a damaged one is passed over, the rest play
+                Some(Err(Error::Malformed(_))) | None => Ok(Vec::new()),
+                Some(Err(e)) => Err(e),
+            },
         }
     }
 }
@@ -712,6 +753,172 @@ mod tests {
         let first = reader.next_frame();
         assert!(first.is_err(), "{first:?}");
         assert_eq!(reader.next_frame(), first);
+    }
+
+    fn motion_jpeg() -> Clip {
+        Clip { motion_jpeg: true, quicktime: true, ..small() }
+    }
+
+    /// Motion JPEG (older digital cameras) had no decoder: such a file opened as "jpeg",
+    /// unplayable and without a poster.
+    #[test]
+    fn motion_jpeg_plays_frame_by_frame() {
+        let video = Video::open(clip(&motion_jpeg()).unwrap()).unwrap();
+        let info = video.info();
+        assert_eq!((info.codec.clone(), info.codec.name(), info.playable), (Codec::MotionJpeg, "Motion JPEG", true));
+        assert_eq!((info.width, info.height, info.rotation, info.frames), (64, 48, 0, 12));
+        assert!((info.duration - 0.5).abs() < 1e-6, "{}", info.duration);
+        let mut reader = video.reader().unwrap();
+        reader.set_draft(true);
+        let mut frames = Vec::new();
+        while let Some(frame) = reader.next_frame().unwrap() {
+            frames.push(frame);
+        }
+        assert_eq!(frames.len(), 12);
+        for (i, frame) in frames.iter().enumerate() {
+            assert_eq!((frame.width, frame.height, frame.rgba.len()), (64, 48, 64 * 48 * 4));
+            assert!((frame.time - i as f64 / 24.0).abs() < 1e-6, "frame {i} at {}", frame.time);
+            assert!((level(frame) - grey(i as u32)).abs() <= 8, "frame {i}: {} for {}", level(frame), grey(i as u32));
+            assert!(red(frame, 0.25, 0.25) && !red(frame, 0.75, 0.25) && !red(frame, 0.25, 0.75), "frame {i}");
+        }
+        assert_eq!(reader.next_frame().unwrap(), None, "and stays finished");
+        // every frame is a key frame: a seek lands on any of them
+        for target in [7usize, 0, 11, 4] {
+            reader.seek(target as f64 / 24.0 + 0.001).unwrap();
+            let frame = reader.next_frame().unwrap().unwrap();
+            assert!((frame.time - target as f64 / 24.0).abs() < 1e-6, "sought {target}, got {}", frame.time);
+            assert!((level(&frame) - grey(target as u32)).abs() <= 8, "sought {target}");
+        }
+    }
+
+    #[test]
+    fn motion_jpeg_is_turned_and_reduced_like_the_rest() {
+        for (rotation, at) in [(1u8, (0.75, 0.25)), (2, (0.75, 0.75)), (3, (0.25, 0.75))] {
+            let video = Video::open(clip(&Clip { rotation, ..motion_jpeg() }).unwrap()).unwrap();
+            let frame = video.poster_frame(None).unwrap();
+            assert_eq!((frame.width, frame.height), if rotation % 2 == 1 { (48, 64) } else { (64, 48) });
+            assert!(red(&frame, at.0, at.1) && !red(&frame, 1.0 - at.0, 1.0 - at.1), "rotation {rotation}");
+        }
+        let video = Video::open(clip(&motion_jpeg()).unwrap()).unwrap();
+        let frame = video.poster_frame(Some(16)).unwrap();
+        assert_eq!((frame.width, frame.height), (16, 12));
+        assert!(red(&frame, 0.25, 0.25) && !red(&frame, 0.75, 0.75));
+    }
+
+    /// The bytes of sample `index` of the file's video track, as (offset, length).
+    fn sample_span(bytes: &[u8], index: usize) -> (usize, usize) {
+        let file = filmcraft_isobmff::open(bytes.to_vec()).unwrap();
+        let sample = &file.tracks[0].samples[index];
+        (sample.offset as usize, sample.size as usize)
+    }
+
+    #[test]
+    fn a_damaged_motion_jpeg_frame_is_passed_over() {
+        let mut bytes = clip(&motion_jpeg()).unwrap();
+        // frames 0 and 3 are not pictures any more
+        for index in [0, 3] {
+            let (at, len) = sample_span(&bytes, index);
+            bytes[at..at + len].fill(0x55);
+        }
+        let video = Video::open(bytes.clone()).unwrap();
+        let poster = video.poster_frame(None).unwrap();
+        assert!((poster.time - 1.0 / 24.0).abs() < 1e-6, "the first picture that decodes: {}", poster.time);
+        let mut reader = video.reader().unwrap();
+        let mut times = Vec::new();
+        while let Some(frame) = reader.next_frame().unwrap() {
+            times.push((frame.time * 24.0).round() as u32);
+        }
+        assert_eq!(times, [1, 2, 4, 5, 6, 7, 8, 9, 10, 11]);
+        // with no frame left the video has no pictures: an error, not a panic or an endless loop
+        let (first, _) = sample_span(&bytes, 0);
+        let (last, len) = sample_span(&bytes, 11);
+        bytes[first..last + len].fill(0x55);
+        let video = Video::open(bytes).unwrap();
+        assert!(matches!(video.poster_frame(None), Err(Error::Malformed(_))));
+        assert_eq!(video.reader().unwrap().next_frame(), Ok(None));
+    }
+
+    #[test]
+    fn damaged_motion_jpeg_files_are_errors_never_panics() {
+        let good = clip(&Clip { sound: true, ..motion_jpeg() }).unwrap();
+        let play = |bytes: Vec<u8>| {
+            if let Ok(video) = Video::open(bytes)
+                && let Ok(mut reader) = video.reader()
+            {
+                let _ = reader.seek(0.2);
+                for _ in 0..16 {
+                    if !matches!(reader.next_frame(), Ok(Some(_))) {
+                        break;
+                    }
+                }
+            }
+        };
+        for cut in (0..good.len()).step_by(good.len() / 97 + 1) {
+            play(good[..cut].to_vec());
+        }
+        let mut seed = 0x1234_5678u32;
+        for round in 0..300 {
+            let mut bad = good.clone();
+            for _ in 0..=(round % 4) {
+                seed = seed.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+                let at = seed as usize % bad.len();
+                bad[at] = (seed >> 24) as u8;
+            }
+            play(bad);
+        }
+    }
+
+    /// A clip from an older camera: Motion JPEG with 8-bit sound under the QuickTime code `raw `.
+    /// The demuxer took that sound for video and refused the file ("truncated data while reading
+    /// sample entry"), so it could not even be imported.
+    #[test]
+    fn a_clip_with_raw_8_bit_sound_opens_and_plays() {
+        for clip_ in [Clip { sound: true, ..motion_jpeg() }, Clip { sound: true, quicktime: true, ..small() }] {
+            let bytes = clip(&clip_).unwrap();
+            assert!(bytes.windows(4).any(|w| w == b"raw "), "the sound is stored as `raw `");
+            assert!(filmcraft_isobmff::open(&bytes).is_err(), "the demuxer alone still refuses it: the workaround is needed");
+            let video = Video::open(bytes).unwrap();
+            let info = video.info();
+            assert_eq!((info.width, info.height, info.frames, info.playable, info.has_audio), (64, 48, 12, true, true));
+            let mut reader = video.reader().unwrap();
+            let mut frames = 0;
+            while let Some(frame) = reader.next_frame().unwrap() {
+                assert!((level(&frame) - grey(frames)).abs() <= 8, "frame {frames}");
+                frames += 1;
+            }
+            assert_eq!(frames, 12);
+        }
+        // the same sound in a file that never needed help is left alone
+        let video = Video::open(clip(&Clip { sound: true, ..small() }).unwrap()).unwrap();
+        assert!(video.info().has_audio);
+    }
+
+    /// Interlaced Motion JPEG (`mjpa`, `mjpb`) is named, and refused with a reason.
+    #[test]
+    fn interlaced_motion_jpeg_is_a_clear_error() {
+        let mut bytes = clip(&motion_jpeg()).unwrap();
+        let moov = bytes.windows(4).position(|w| w == b"moov").unwrap();
+        let entry = moov + bytes[moov..].windows(4).position(|w| w == b"jpeg").unwrap();
+        bytes[entry..entry + 4].copy_from_slice(b"mjpa");
+        let video = Video::open(bytes).unwrap();
+        assert_eq!((video.info().codec.clone(), video.info().playable), (Codec::Other("mjpa".into()), false));
+        assert_eq!(video.reader().err(), Some(Error::Unsupported("no decoder for mjpa video".into())));
+    }
+
+    /// Open and decode a real file: `LC_VIDEO_FILE=<path> cargo test -p lightcraft-video real_file -- --nocapture`.
+    #[test]
+    fn real_file_opens_and_decodes() {
+        let Ok(path) = std::env::var("LC_VIDEO_FILE") else { return };
+        let video = Video::open_path(&path).unwrap();
+        println!("{path}: {:?}", video.info());
+        let mut reader = video.reader().unwrap();
+        let (started, mut frames) = (std::time::Instant::now(), 0usize);
+        while let Some(frame) = reader.next_frame().unwrap() {
+            assert_eq!(frame.rgba.len(), frame.width as usize * frame.height as usize * 4);
+            frames += 1;
+        }
+        println!("{frames} of {} frames, {:.1} ms a frame", video.info().frames, started.elapsed().as_secs_f64() * 1e3 / frames.max(1) as f64);
+        assert!(frames > 0);
     }
 
     #[cfg(not(feature = "hevc"))]

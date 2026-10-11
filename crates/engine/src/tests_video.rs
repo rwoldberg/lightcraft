@@ -66,6 +66,26 @@ fn videos_import_with_kind_duration_and_a_poster() {
     let _ = std::fs::remove_dir_all(&src);
 }
 
+/// A clip from an older digital camera (Motion JPEG, 8-bit sound stored as `raw `) failed the
+/// import probe: nothing could read its sound description or decode its frames. It imports as a
+/// video, and its poster is its first frame.
+#[test]
+fn a_motion_jpeg_clip_imports_with_a_poster() {
+    let src = temp_dir("mjpeg");
+    let old = Clip { motion_jpeg: true, quicktime: true, sound: true, ..small() };
+    std::fs::write(src.join("P8250039.MOV"), clip(&old).unwrap()).unwrap();
+    let mut s = Session::new().with_fs();
+    let r = s.execute("library.import", &json!({"paths": [src.to_string_lossy()]})).unwrap();
+    assert_eq!(imported(&r).len(), 1, "{r}");
+    let p = s.catalog.photos().next().map(|p| (**p).clone()).unwrap();
+    assert_eq!((p.kind, p.format.as_str(), p.width, p.height), (MediaKind::Video, "MOV", 64, 48));
+    assert!((p.duration.unwrap() - 0.5).abs() < 1e-6, "{:?}", p.duration);
+    let [r_, g, b] = mean(&mut s, p.id);
+    assert!(r_ > g + 5.0 && (g - b).abs() < 12.0 && g > 10.0 && g < 120.0, "poster mean {:?}", [r_, g, b]);
+    assert!(s.thumb_job(p.id, 96).unwrap().run().rendered.is_ok());
+    let _ = std::fs::remove_dir_all(&src);
+}
+
 /// A file that carries a preview image shows that, not its first picture.
 #[test]
 fn an_embedded_preview_is_the_poster() {

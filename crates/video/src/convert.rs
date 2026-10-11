@@ -1,4 +1,5 @@
-//! Decoded planar 4:2:0 pictures → display RGBA, reduced and rotated on the way.
+//! Decoded pictures (planar 4:2:0, or packed RGB from a JPEG) → display RGBA, reduced and rotated
+//! on the way.
 
 /// The samples of one plane.
 #[derive(Clone, Copy)]
@@ -101,14 +102,49 @@ pub(crate) fn to_rgba(picture: &Yuv, rotation: u8, divisor: u32) -> (u32, u32, V
             let r = (luma + k.r_v * v + 8192) >> 14;
             let g = (luma - k.g_u * u - k.g_v * v + 8192) >> 14;
             let b = (luma + k.b_u * u + 8192) >> 14;
-            let (x, y) = match rotation % 4 {
-                0 => (col, row),
-                1 => (h - 1 - row, col),
-                2 => (w - 1 - col, h - 1 - row),
-                _ => (row, w - 1 - col),
-            };
+            let (x, y) = turned(col, row, w, h, rotation);
             if let Some(px) = out.get_mut((y * out_w + x) * 4..(y * out_w + x) * 4 + 3) {
                 px.copy_from_slice(&[r.clamp(0, 255) as u8, g.clamp(0, 255) as u8, b.clamp(0, 255) as u8]);
+            }
+        }
+    }
+    (out_w as u32, out_h as u32, out)
+}
+
+/// Where the sample at (`col`, `row`) of a `w` x `h` picture is shown after `rotation` quarter
+/// turns clockwise.
+fn turned(col: usize, row: usize, w: usize, h: usize, rotation: u8) -> (usize, usize) {
+    match rotation % 4 {
+        0 => (col, row),
+        1 => (h - 1 - row, col),
+        2 => (w - 1 - col, h - 1 - row),
+        _ => (row, w - 1 - col),
+    }
+}
+
+/// [`to_rgba`] for a picture that is already display values, `channels` bytes a pixel: grey (1),
+/// RGB (3) or RGB and a fourth byte that is ignored (4).
+pub(crate) fn packed_to_rgba(pixels: &[u8], channels: usize, width: u32, height: u32, rotation: u8, divisor: u32) -> (u32, u32, Vec<u8>) {
+    let d = divisor.max(1) as usize;
+    let (out_w, out_h) = output_size(width, height, rotation, divisor);
+    let (out_w, out_h) = (out_w as usize, out_h as usize);
+    let (width, height) = (width as usize, height as usize);
+    let (w, h) = ((width / d).max(1), (height / d).max(1));
+    let mut out = vec![255u8; out_w.saturating_mul(out_h).saturating_mul(4)];
+    for row in 0..h {
+        let sy = (row * d).min(height.saturating_sub(1));
+        for col in 0..w {
+            let sx = (col * d).min(width.saturating_sub(1));
+            let at = (sy * width + sx) * channels;
+            // outside the picture's data: black, never out of bounds
+            let rgb = match (channels, pixels.get(at..at + channels)) {
+                (1, Some(&[v])) => [v; 3],
+                (3, Some(&[r, g, b])) | (4, Some(&[r, g, b, _])) => [r, g, b],
+                _ => [0; 3],
+            };
+            let (x, y) = turned(col, row, w, h, rotation);
+            if let Some(px) = out.get_mut((y * out_w + x) * 4..(y * out_w + x) * 4 + 3) {
+                px.copy_from_slice(&rgb);
             }
         }
     }
@@ -175,5 +211,28 @@ mod tests {
         // planes shorter than the picture claims read as black, never out of bounds
         let short = to_rgba(&picture(&[235], &[], &[], 1, false), 1, 1);
         assert_eq!(short.2.len(), 2 * 4 * 4);
+    }
+
+    #[test]
+    fn packed_pictures_are_turned_and_reduced_the_same_way() {
+        // 4 x 2, RGB: the top left pixel is red, the rest dark
+        let mut rgb = vec![10u8; 4 * 2 * 3];
+        rgb[..3].copy_from_slice(&[250, 0, 0]);
+        let red = |rotation: u8| {
+            let (w, h, px) = packed_to_rgba(&rgb, 3, 4, 2, rotation, 1);
+            let at = px.as_chunks::<4>().0.iter().position(|p| p == &[250, 0, 0, 255]).unwrap();
+            (w, h, at as u32 % w, at as u32 / w)
+        };
+        assert_eq!(red(0), (4, 2, 0, 0));
+        assert_eq!(red(1), (2, 4, 1, 0));
+        assert_eq!(red(2), (4, 2, 3, 1));
+        assert_eq!(red(3), (2, 4, 0, 3));
+        assert_eq!(packed_to_rgba(&rgb, 3, 4, 2, 0, 2).2, [250, 0, 0, 255, 10, 10, 10, 255]);
+        // grey, and RGB with a fourth byte
+        assert_eq!(packed_to_rgba(&[7, 9], 1, 2, 1, 0, 1).2, [7, 7, 7, 255, 9, 9, 9, 255]);
+        assert_eq!(packed_to_rgba(&[1, 2, 3, 99], 4, 1, 1, 0, 1).2, [1, 2, 3, 255]);
+        // data shorter than the picture claims reads as black, never out of bounds
+        assert_eq!(packed_to_rgba(&[5, 5, 5], 3, 2, 2, 1, 1).2.len(), 2 * 2 * 4);
+        assert_eq!(packed_to_rgba(&[], 0, 2, 2, 0, 1).2[..3], [0, 0, 0]);
     }
 }

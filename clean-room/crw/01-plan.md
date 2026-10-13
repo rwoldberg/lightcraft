@@ -284,7 +284,28 @@ maintainer's.**
 - **The remaining SensorInfo fields** (e.g. the `24, 224, 40, 1856` tail on EOS bodies) may
   resist interpretation without more bodies; unknowns will be documented as unknown.
 
-## 7 Open questions for the maintainer
+## 7 Open questions for the maintainer — **answered 2026-10-12, plan approved**
+
+Maintainer's decisions (recorded verbatim in intent, numbered as below):
+
+1. **Oracle:** no Adobe DNG Converter. LibRaw binary as the arw6 work did; the maintainer will
+   install it when it is needed.
+2. **Black-box probing** before the freeze: allowed, arw6-style (every probe logged).
+3. **libopenraw wiki page:** stays unread.
+4. **Python reference model:** local-only, like arw6's Phase 0 model (not committed). The
+   committed evidence set stays as in this commit; the private-file name+size+hash table in
+   §2.2 is fine to keep.
+5. **Scope order:** agreed — D60-class first, then D30, then G1/G5/G6.
+6. **NC-licensed bodies:** accept "unverified, header-matched" decoding. The maintainer owns
+   none of those cameras and has no files from them.
+7. **Extra captures:** the maintainer still has the D60 (and a D20) and will provide controlled
+   shots when the derivation needs them.
+
+Also noted by the maintainer: the earlier `crw-decode` branch has been deleted and no longer
+exists in the repository; the do-not-read rule about it is therefore moot but remains honoured
+for any surviving copies.
+
+### Original questions (for the record)
 
 1. **Oracle** (§5a): approve candidate (1) (official pre-built LibRaw binary, black box), and
    who runs it — you, or me after your explicit approval of the specific download? Allow (2)
@@ -313,4 +334,4 @@ maintainer's.**
 
 ---
 
-*Next step after approval: P1 scripts and `03-payload-layout.md`. Nothing else starts.*
+*Approved 2026-10-12 (§7). P0 documentation and P1 are under way.*

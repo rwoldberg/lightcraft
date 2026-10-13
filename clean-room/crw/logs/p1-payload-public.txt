@@ -1,0 +1,195 @@
+== ../../corpus/crw/crw-canon-eos-10d-a.crw
+  raw 3152x2068  S=7134454  tbl=0  f1=0 f2=514  L=5504868  S-L=1629586  wh/4=1629584  S-L-wh/4=2
+  leading zero run: 5516 bytes  (= 7.00 rows of 2-bit LSBs)
+  last 8 bytes: 95ad8fb002120000
+  prefix hypothesis  — region [0 : wh/4) as 2-bit rows:
+      prefix: 2068 rows of 788 B, leading all-zero rows: 7
+        rows 0..top: mean   85.37 ent 5.190
+        top..top+32: mean  127.88 ent 7.993
+        middle 32: mean  126.86 ent 7.992
+        last 32: mean  127.02 ent 7.993
+  suffix hypothesis  — region [L : L+wh/4) as 2-bit rows:
+      suffix: 2068 rows of 788 B, leading all-zero rows: 0
+        rows 0..top: mean  132.23 ent 7.944
+        top..top+32: mean  131.83 ent 7.953
+        middle 32: mean  128.56 ent 7.959
+        last 32: mean  126.95 ent 7.956
+  compressed-candidate stats:
+      after-prefix [wh/4 : wh/4+L): entropy 7.9684 (first MiB), 7.9644 (last MiB)
+      from-0 [0 : L): entropy 7.9960 (first MiB), 7.9530 (last MiB)
+      stuffing check: ff count 13614 (0.2473%), ff00 digrams 13614, expected-if-independent 64.4
+
+== ../../corpus/crw/crw-canon-eos-10d-b.crw
+  raw 3152x2068  S=7244858  tbl=2  f1=0 f2=514  L=5615272  S-L=1629586  wh/4=1629584  S-L-wh/4=2
+  leading zero run: 5516 bytes  (= 7.00 rows of 2-bit LSBs)
+  last 8 bytes: 0c849b8b12b70000
+  prefix hypothesis  — region [0 : wh/4) as 2-bit rows:
+      prefix: 2068 rows of 788 B, leading all-zero rows: 7
+        rows 0..top: mean   64.32 ent 5.152
+        top..top+32: mean  121.98 ent 7.958
+        middle 32: mean  126.50 ent 7.992
+        last 32: mean  127.17 ent 7.993
+  suffix hypothesis  — region [L : L+wh/4) as 2-bit rows:
+      suffix: 2068 rows of 788 B, leading all-zero rows: 0
+        rows 0..top: mean  117.92 ent 7.937
+        top..top+32: mean  117.33 ent 7.941
+        middle 32: mean  114.53 ent 7.905
+        last 32: mean  117.63 ent 7.904
+  compressed-candidate stats:
+      after-prefix [wh/4 : wh/4+L): entropy 7.9877 (first MiB), 7.9150 (last MiB)
+      from-0 [0 : L): entropy 7.9898 (first MiB), 7.9220 (last MiB)
+      stuffing check: ff count 12542 (0.2234%), ff00 digrams 12542, expected-if-independent 97.9
+
+== ../../corpus/crw/crw-canon-eos-10d-c.crw
+  raw 3152x2068  S=7455524  tbl=2  f1=0 f2=514  L=5825938  S-L=1629586  wh/4=1629584  S-L-wh/4=2
+  leading zero run: 5516 bytes  (= 7.00 rows of 2-bit LSBs)
+  last 8 bytes: 9c12ce7bde990000
+  prefix hypothesis  — region [0 : wh/4) as 2-bit rows:
+      prefix: 2068 rows of 788 B, leading all-zero rows: 7
+        rows 0..top: mean   78.12 ent 5.144
+        top..top+32: mean  126.89 ent 7.992
+        middle 32: mean  127.89 ent 7.993
+        last 32: mean  127.04 ent 7.991
+  suffix hypothesis  — region [L : L+wh/4) as 2-bit rows:
+      suffix: 2068 rows of 788 B, leading all-zero rows: 0
+        rows 0..top: mean  119.60 ent 7.946
+        top..top+32: mean  117.81 ent 7.946
+        middle 32: mean  104.15 ent 7.770
+        last 32: mean  114.88 ent 7.856
+  compressed-candidate stats:
+      after-prefix [wh/4 : wh/4+L): entropy 7.8675 (first MiB), 7.8315 (last MiB)
+      from-0 [0 : L): entropy 7.9961 (first MiB), 7.9712 (last MiB)
+      stuffing check: ff count 6993 (0.1200%), ff00 digrams 6993, expected-if-independent 47.5
+
+== ../../corpus/crw/crw-canon-eos-300d-a.crw
+  raw 3152x2068  S=6929638  tbl=0  f1=0 f2=514  L=5300052  S-L=1629586  wh/4=1629584  S-L-wh/4=2
+  leading zero run: 5516 bytes  (= 7.00 rows of 2-bit LSBs)
+  last 8 bytes: e438ce510ad90000
+  prefix hypothesis  — region [0 : wh/4) as 2-bit rows:
+      prefix: 2068 rows of 788 B, leading all-zero rows: 7
+        rows 0..top: mean   61.27 ent 5.230
+        top..top+32: mean  127.52 ent 7.994
+        middle 32: mean  127.63 ent 7.993
+        last 32: mean  127.31 ent 7.992
+  suffix hypothesis  — region [L : L+wh/4) as 2-bit rows:
+      suffix: 2068 rows of 788 B, leading all-zero rows: 0
+        rows 0..top: mean  132.59 ent 7.950
+        top..top+32: mean  130.96 ent 7.963
+        middle 32: mean  131.10 ent 7.958
+        last 32: mean  134.35 ent 7.947
+  compressed-candidate stats:
+      after-prefix [wh/4 : wh/4+L): entropy 7.9405 (first MiB), 7.9600 (last MiB)
+      from-0 [0 : L): entropy 7.9961 (first MiB), 7.9634 (last MiB)
+      stuffing check: ff count 17631 (0.3327%), ff00 digrams 17631, expected-if-independent 99.9
+
+== ../../corpus/crw/crw-canon-eos-300d-b.crw
+  raw 3152x2068  S=7206250  tbl=2  f1=0 f2=514  L=5576664  S-L=1629586  wh/4=1629584  S-L-wh/4=2
+  leading zero run: 5516 bytes  (= 7.00 rows of 2-bit LSBs)
+  last 8 bytes: f8ff00eefe7f0000
+  prefix hypothesis  — region [0 : wh/4) as 2-bit rows:
+      prefix: 2068 rows of 788 B, leading all-zero rows: 7
+        rows 0..top: mean   61.49 ent 5.196
+        top..top+32: mean  127.65 ent 7.989
+        middle 32: mean  112.85 ent 7.534
+        last 32: mean  119.27 ent 7.834
+  suffix hypothesis  — region [L : L+wh/4) as 2-bit rows:
+      suffix: 2068 rows of 788 B, leading all-zero rows: 0
+        rows 0..top: mean  124.00 ent 7.968
+        top..top+32: mean  127.27 ent 7.978
+        middle 32: mean  127.36 ent 7.985
+        last 32: mean  130.81 ent 7.973
+  compressed-candidate stats:
+      after-prefix [wh/4 : wh/4+L): entropy 7.9774 (first MiB), 7.9887 (last MiB)
+      from-0 [0 : L): entropy 7.8118 (first MiB), 7.9812 (last MiB)
+      stuffing check: ff count 28275 (0.5070%), ff00 digrams 28275, expected-if-independent 265.2
+
+== ../../corpus/crw/crw-canon-eos-d30.crw
+  raw 2224x1456  S=2824648  tbl=1  f1=0 f2=514  L=2015110  S-L=809538  wh/4=809536  S-L-wh/4=2
+  leading zero run: 0 bytes  (= 0.00 rows of 2-bit LSBs)
+  last 8 bytes: fadfd6feb7f50000
+  prefix hypothesis  — region [0 : wh/4) as 2-bit rows:
+      prefix: 1456 rows of 556 B, leading all-zero rows: 0
+        rows 0..top: mean  139.68 ent 7.911
+        top..top+32: mean  127.19 ent 7.990
+        middle 32: mean  127.59 ent 7.988
+        last 32: mean  131.21 ent 7.924
+  suffix hypothesis  — region [L : L+wh/4) as 2-bit rows:
+      suffix: 1456 rows of 556 B, leading all-zero rows: 0
+        rows 0..top: mean  123.77 ent 7.922
+        top..top+32: mean  123.76 ent 7.936
+        middle 32: mean  116.78 ent 7.895
+        last 32: mean  116.20 ent 7.890
+  compressed-candidate stats:
+      after-prefix [wh/4 : wh/4+L): entropy 7.9343 (first MiB), 7.9341 (last MiB)
+      from-0 [0 : L): entropy 7.9949 (first MiB), 7.9410 (last MiB)
+      stuffing check: ff count 2576 (0.1278%), ff00 digrams 2576, expected-if-independent 14.1
+
+== ../../corpus/crw/crw-canon-eos-d60.crw
+  raw 3152x2068  S=6694146  tbl=0  f1=0 f2=514  L=5064559  S-L=1629587  wh/4=1629584  S-L-wh/4=3
+  leading zero run: 5516 bytes  (= 7.00 rows of 2-bit LSBs)
+  last 8 bytes: 9385933317ff0000
+  prefix hypothesis  — region [0 : wh/4) as 2-bit rows:
+      prefix: 2068 rows of 788 B, leading all-zero rows: 7
+        rows 0..top: mean   55.84 ent 5.113
+        top..top+32: mean  127.09 ent 7.992
+        middle 32: mean  127.69 ent 7.993
+        last 32: mean  127.98 ent 7.992
+  suffix hypothesis  — region [L : L+wh/4) as 2-bit rows:
+      suffix: 2068 rows of 788 B, leading all-zero rows: 0
+        rows 0..top: mean  130.50 ent 7.942
+        top..top+32: mean  131.88 ent 7.949
+        middle 32: mean  131.47 ent 7.951
+        last 32: mean  126.89 ent 7.967
+  compressed-candidate stats:
+      after-prefix [wh/4 : wh/4+L): entropy 7.9003 (first MiB), 7.9694 (last MiB)
+      from-0 [0 : L): entropy 7.9960 (first MiB), 7.9672 (last MiB)
+      stuffing check: ff count 14189 (0.2802%), ff00 digrams 14189, expected-if-independent 76.1
+
+== ../../corpus/crw/crw-canon-eos-digital-rebel.crw
+  raw 3152x2068  S=6406164  tbl=0  f1=0 f2=514  L=4776577  S-L=1629587  wh/4=1629584  S-L-wh/4=3
+  leading zero run: 5516 bytes  (= 7.00 rows of 2-bit LSBs)
+  last 8 bytes: 191093af87ff0000
+  prefix hypothesis  — region [0 : wh/4) as 2-bit rows:
+      prefix: 2068 rows of 788 B, leading all-zero rows: 7
+        rows 0..top: mean   58.54 ent 3.603
+        top..top+32: mean  144.80 ent 5.469
+        middle 32: mean  163.93 ent 4.986
+        last 32: mean  154.41 ent 5.106
+  suffix hypothesis  — region [L : L+wh/4) as 2-bit rows:
+      suffix: 2068 rows of 788 B, leading all-zero rows: 0
+        rows 0..top: mean  128.96 ent 7.960
+        top..top+32: mean  129.35 ent 7.966
+        middle 32: mean  127.02 ent 7.922
+        last 32: mean  122.47 ent 7.926
+  compressed-candidate stats:
+      after-prefix [wh/4 : wh/4+L): entropy 7.9244 (first MiB), 7.9355 (last MiB)
+      from-0 [0 : L): entropy 5.9926 (first MiB), 7.9542 (last MiB)
+      stuffing check: ff count 6718 (0.1406%), ff00 digrams 6718, expected-if-independent 36.3
+
+== ../../corpus/crw/crw-canon-powershot-g1.crw
+  raw 2144x1560  S=2257354  tbl=1  f1=0 f2=514  L=2257351  S-L=3  wh/4=836160  S-L-wh/4=-836157
+  leading zero run: 514 bytes  (= 0.96 rows of 2-bit LSBs)
+  last 8 bytes: 34e0702c2fffd900
+  no wh/4 region (PowerShot class): compressed assumed [0 : L)
+      entropy first MiB 7.9226, last MiB 7.9396
+      stuffing check: ff count 2676 (0.1185%), ff00 digrams 2676, expected-if-independent 11.4
+      tail region [L : S): 3 bytes, hex ffd900
+
+== ../../corpus/crw/crw-canon-powershot-g5.crw
+  raw 2672x1968  S=4861806  tbl=1  f1=0 f2=514  L=4861804  S-L=2  wh/4=1314624  S-L-wh/4=-1314622
+  leading zero run: 514 bytes  (= 0.77 rows of 2-bit LSBs)
+  last 8 bytes: 71928822fd7fffd9
+  no wh/4 region (PowerShot class): compressed assumed [0 : L)
+      entropy first MiB 7.9958, last MiB 7.9087
+      stuffing check: ff count 9974 (0.2052%), ff00 digrams 4958, expected-if-independent 54.4
+      tail region [L : S): 2 bytes, hex ffd9
+
+== ../../corpus/crw/crw-canon-powershot-g6.crw
+  raw 3160x2344  S=7313156  tbl=0  f1=0 f2=514  L=7313154  S-L=2  wh/4=1851760  S-L-wh/4=-1851758
+  leading zero run: 514 bytes  (= 0.65 rows of 2-bit LSBs)
+  last 8 bytes: dfbf7efdfbf7ffd9
+  no wh/4 region (PowerShot class): compressed assumed [0 : L)
+      entropy first MiB 7.9995, last MiB 7.9596
+      stuffing check: ff count 18811 (0.2572%), ff00 digrams 10815, expected-if-independent 103.5
+      tail region [L : S): 2 bytes, hex ffd9
+

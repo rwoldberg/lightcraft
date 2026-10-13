@@ -1,0 +1,109 @@
+== ../../corpus/crw/crw-canon-eos-10d-a.crw
+  raw 3152x2068 tbl=0 f2=514 L=5504868 lowbits=yes
+  ff followed by: 00:13614
+  markers: none (pure stuffed entropy data)
+  comp[0:24]   : 000000000000000000000000000000000000000000000000
+  comp[-8:]    : 9df595ad8fb00212
+  raw[504:544] : 00000000000000000000000000000000000000000000000000000000000000000000000000000000
+  raw[-8:]     : 95ad8fb002120000
+  low[-8:]     : fc3590b2d228d3dd (end of low-bits region)
+
+== ../../corpus/crw/crw-canon-eos-10d-b.crw
+  raw 3152x2068 tbl=2 f2=514 L=5615272 lowbits=yes
+  ff followed by: 00:12542
+  markers: none (pure stuffed entropy data)
+  comp[0:24]   : 000000000000000000000000000000000000000000000000
+  comp[-8:]    : 38650c849b8b12b7
+  raw[504:544] : 00000000000000000000000000000000000000000000000000000000000000000000000000000000
+  raw[-8:]     : 0c849b8b12b70000
+  low[-8:]     : c6371ccbb9d8dd2c (end of low-bits region)
+
+== ../../corpus/crw/crw-canon-eos-10d-c.crw
+  raw 3152x2068 tbl=2 f2=514 L=5825938 lowbits=yes
+  ff followed by: 00:6993
+  markers: none (pure stuffed entropy data)
+  comp[0:24]   : 000000000000000000000000000000000000000000000000
+  comp[-8:]    : e7389c12ce7bde99
+  raw[504:544] : 00000000000000000000000000000000000000000000000000000000000000000000000000000000
+  raw[-8:]     : 9c12ce7bde990000
+  low[-8:]     : eb6d0fe72354f02c (end of low-bits region)
+
+== ../../corpus/crw/crw-canon-eos-300d-a.crw
+  raw 3152x2068 tbl=0 f2=514 L=5300052 lowbits=yes
+  ff followed by: 00:17631
+  markers: none (pure stuffed entropy data)
+  comp[0:24]   : 000000000000000000000000000000000000000000000000
+  comp[-8:]    : 22c9e438ce510ad9
+  raw[504:544] : 00000000000000000000000000000000000000000000000000000000000000000000000000000000
+  raw[-8:]     : e438ce510ad90000
+  low[-8:]     : a93331aa85cdb788 (end of low-bits region)
+
+== ../../corpus/crw/crw-canon-eos-300d-b.crw
+  raw 3152x2068 tbl=2 f2=514 L=5576664 lowbits=yes
+  ff followed by: 00:28275
+  markers: none (pure stuffed entropy data)
+  comp[0:24]   : 000000000000000000000000000000000000000000000000
+  comp[-8:]    : bbe9f8ff00eefe7f
+  raw[504:544] : 00000000000000000000000000000000000000000000000000000000000000000000000000000000
+  raw[-8:]     : f8ff00eefe7f0000
+  low[-8:]     : bbb7b7b7bbb777c7 (end of low-bits region)
+
+== ../../corpus/crw/crw-canon-eos-d30.crw
+  raw 2224x1456 tbl=1 f2=514 L=2015110 lowbits=yes
+  ff followed by: 00:2576
+  markers: none (pure stuffed entropy data)
+  comp[0:24]   : 000000000000000000000000000000000000000000000000
+  comp[-8:]    : 7f5bfadfd6feb7f5
+  raw[504:544] : a57fba0edb9db8e63afc7b4eaa3c6dae0efbabaf3fcc8bbee8f93db67aabbee9ce27ba68a9bfaa26
+  raw[-8:]     : fadfd6feb7f50000
+  low[-8:]     : ffffffffffffffff (end of low-bits region)
+
+== ../../corpus/crw/crw-canon-eos-d60.crw
+  raw 3152x2068 tbl=0 f2=514 L=5064559 lowbits=yes
+  ff followed by: 00:14189
+  markers: none (pure stuffed entropy data)
+  comp[0:24]   : 000000000000000000000000000000000000000000000000
+  comp[-8:]    : 51f18a9385933317
+  raw[504:544] : 00000000000000000000000000000000000000000000000000000000000000000000000000000000
+  raw[-8:]     : 9385933317ff0000
+  low[-8:]     : 82961c457559780e (end of low-bits region)
+
+== ../../corpus/crw/crw-canon-eos-digital-rebel.crw
+  raw 3152x2068 tbl=0 f2=514 L=4776577 lowbits=yes
+  ff followed by: 00:6718
+  markers: none (pure stuffed entropy data)
+  comp[0:24]   : 000000000000000000000000000000000000000000000000
+  comp[-8:]    : fc86e6191093af87
+  raw[504:544] : 00000000000000000000000000000000000000000000000000000000000000000000000000000000
+  raw[-8:]     : 191093af87ff0000
+  low[-8:]     : 66ee4e6c4cc6cece (end of low-bits region)
+
+== ../../corpus/crw/crw-canon-powershot-g1.crw
+  raw 2144x1560 tbl=1 f2=514 L=2257351 lowbits=no
+  ff followed by: 00:2676
+  markers: none (pure stuffed entropy data)
+  comp[0:24]   : 000000000000000000000000000000000000000000000000
+  comp[-8:]    : 3efec534e0702c2f
+  raw[504:544] : 00000000000000000000f83df43825313b62bf97ebdc24f476407e600ce3f30b9211928d5f8de276
+  raw[-8:]     : 34e0702c2fffd900
+
+== ../../corpus/crw/crw-canon-powershot-g5.crw
+  raw 2672x1968 tbl=1 f2=514 L=4861804 lowbits=no
+  ff followed by: 00:4958, fa:40, e7:35, d8:35, 24:33, c0:32, d3:31, 34:30
+  markers: ff01:20, ff02:16, ff03:24, ff04:23, ff05:16, ff06:23, ff07:23, ff08:14, ff09:16, ff0a:21, ff0b:22, ff0c:16, ff0d:22, ff0e:26, ff0f:24, ff10:27, ff11:25, ff12:17, ff13:30, ff14:21, ff15:13, ff16:15, ff17:22, ff18:19, ff19:22, ff1a:18, ff1b:24, ff1c:18, ff1d:9, ff1e:20, ff1f:20, ff20:22, ff21:18, ff22:20, ff23:19, ff24:33, ff25:12, ff26:15, ff27:24, ff28:22, ff29:27, ff2a:18, ff2b:21, ff2c:14, ff2d:23, ff2e:15, ff2f:17, ff30:16, ff31:18, ff32:22, ff33:17, ff34:30, ff35:15, ff36:20, ff37:19, ff38:21, ff39:18, ff3a:16, ff3b:19, ff3c:16, ff3d:27, ff3e:16, ff3f:19, ff40:22, ff41:20, ff42:23, ff43:16, ff44:13, ff45:15, ff46:25, ff47:12, ff48:10, ff49:19, ff4a:18, ff4b:17, ff4c:25, ff4d:17, ff4e:25, ff4f:17, ff50:27, ff51:24, ff52:20, ff53:17, ff54:17, ff55:20, ff56:21, ff57:19, ff58:18, ff59:17, ff5a:13, ff5b:14, ff5c:18, ff5d:27, ff5e:21, ff5f:22, ff60:18, ff61:15, ff62:15, ff63:15, ff64:24, ff65:25, ff66:15, ff67:13, ff68:19, ff69:16, ff6a:13, ff6b:17, ff6c:26, ff6d:24, ff6e:18, ff6f:12, ff70:22, ff71:13, ff72:17, ff73:18, ff74:16, ff75:13, ff76:24, ff77:24, ff78:19, ff79:13, ff7a:26, ff7b:23, ff7c:28, ff7d:14, ff7e:15, ff7f:19, ff80:22, ff81:20, ff82:17, ff83:23, ff84:15, ff85:22, ff86:16, ff87:24, ff88:24, ff89:25, ff8a:18, ff8b:13, ff8c:18, ff8d:18, ff8e:23, ff8f:15, ff90:20, ff91:19, ff92:17, ff93:17, ff94:20, ff95:10, ff96:14, ff97:18, ff98:15, ff99:14, ff9a:22, ff9b:20, ff9c:20, ff9d:21, ff9e:21, ff9f:18, ffa0:21, ffa1:14, ffa2:20, ffa3:18, ffa4:21, ffa5:22, ffa6:24, ffa7:10, ffa8:16, ffa9:22, ffaa:22, ffab:16, ffac:25, ffad:22, ffae:28, ffaf:10, ffb0:18, ffb1:20, ffb2:19, ffb3:20, ffb4:20, ffb5:16, ffb6:18, ffb7:18, ffb8:19, ffb9:25, ffba:24, ffbb:12, ffbc:21, ffbd:12, ffbe:28, ffbf:22, ffc0:32, ffc1:21, ffc2:20, ffc3:14, ffc4:25, ffc5:14, ffc6:24, ffc7:18, ffc8:19, ffc9:17, ffca:23, ffcb:16, ffcc:20, ffcd:18, ffce:21, ffcf:17, ffd0:18, ffd1:24, ffd2:12, ffd3:31, ffd4:23, ffd5:16, ffd6:24, ffd7:23, ffd8:35, ffd9:17, ffda:15, ffdb:30, ffdc:16, ffdd:21, ffde:17, ffdf:12, ffe0:24, ffe1:22, ffe2:16, ffe3:23, ffe4:25, ffe5:24, ffe6:13, ffe7:35, ffe8:19, ffe9:14, ffea:25, ffeb:13, ffec:24, ffed:26, ffee:20, ffef:17, fff0:24, fff1:17, fff2:20, fff3:17, fff4:19, fff5:23, fff6:19, fff7:18, fff8:21, fff9:17, fffa:40, fffb:12, fffc:18, fffd:30, fffe:25, ffff:14
+  first markers at: [('0x2b9', '0x43'), ('0x36a', '0x9d'), ('0x669', '0x95'), ('0x6a3', '0x37'), ('0x909', '0x29'), ('0x93a', '0xad'), ('0x9f9', '0x7f'), ('0xa55', '0x68'), ('0xc5f', '0x47'), ('0xf97', '0x65'), ('0x1068', '0x3a'), ('0x1210', '0x51')]
+  comp[0:24]   : 000000000000000000000000000000000000000000000000
+  comp[-8:]    : 426771928822fd7f
+  raw[504:544] : 000000000000000000009e16f4366ff2c547b59c5e132991784465d6f539fd37876356e9155982fa
+  raw[-8:]     : 71928822fd7fffd9
+
+== ../../corpus/crw/crw-canon-powershot-g6.crw
+  raw 3160x2344 tbl=0 f2=514 L=7313154 lowbits=no
+  ff followed by: 00:10815, ff:68, 37:61, 77:60, 7f:59, bb:58, ee:58, 33:56
+  markers: ff01:24, ff02:24, ff03:31, ff04:17, ff05:39, ff06:29, ff07:31, ff08:23, ff09:31, ff0a:32, ff0b:26, ff0c:33, ff0d:27, ff0e:34, ff0f:29, ff10:27, ff11:22, ff12:33, ff13:28, ff14:27, ff15:35, ff16:24, ff17:31, ff18:18, ff19:26, ff1a:28, ff1b:28, ff1c:24, ff1d:21, ff1e:30, ff1f:29, ff20:35, ff21:38, ff22:31, ff23:37, ff24:32, ff25:34, ff26:18, ff27:22, ff28:30, ff29:29, ff2a:25, ff2b:23, ff2c:26, ff2d:36, ff2e:44, ff2f:27, ff30:38, ff31:38, ff32:27, ff33:56, ff34:19, ff35:27, ff36:31, ff37:61, ff38:27, ff39:26, ff3a:25, ff3b:41, ff3c:23, ff3d:32, ff3e:24, ff3f:51, ff40:39, ff41:34, ff42:21, ff43:21, ff44:26, ff45:35, ff46:25, ff47:33, ff48:27, ff49:35, ff4a:27, ff4b:31, ff4c:19, ff4d:25, ff4e:34, ff4f:31, ff50:22, ff51:23, ff52:17, ff53:35, ff54:29, ff55:28, ff56:29, ff57:30, ff58:21, ff59:30, ff5a:25, ff5b:35, ff5c:19, ff5d:33, ff5e:25, ff5f:26, ff60:32, ff61:35, ff62:31, ff63:26, ff64:29, ff65:20, ff66:32, ff67:23, ff68:38, ff69:27, ff6a:29, ff6b:27, ff6c:34, ff6d:32, ff6e:43, ff6f:24, ff70:22, ff71:24, ff72:34, ff73:50, ff74:30, ff75:26, ff76:28, ff77:60, ff78:36, ff79:21, ff7a:35, ff7b:47, ff7c:31, ff7d:27, ff7e:27, ff7f:59, ff80:35, ff81:35, ff82:33, ff83:22, ff84:27, ff85:20, ff86:23, ff87:24, ff88:21, ff89:24, ff8a:26, ff8b:31, ff8c:18, ff8d:23, ff8e:27, ff8f:41, ff90:22, ff91:21, ff92:26, ff93:28, ff94:32, ff95:27, ff96:27, ff97:29, ff98:33, ff99:29, ff9a:34, ff9b:32, ff9c:25, ff9d:33, ff9e:18, ff9f:28, ffa0:31, ffa1:25, ffa2:22, ffa3:29, ffa4:19, ffa5:20, ffa6:20, ffa7:32, ffa8:43, ffa9:33, ffaa:33, ffab:34, ffac:18, ffad:32, ffae:26, ffaf:16, ffb0:31, ffb1:23, ffb2:35, ffb3:50, ffb4:38, ffb5:29, ffb6:29, ffb7:43, ffb8:28, ffb9:22, ffba:34, ffbb:58, ffbc:32, ffbd:23, ffbe:34, ffbf:37, ffc0:24, ffc1:32, ffc2:32, ffc3:30, ffc4:28, ffc5:22, ffc6:28, ffc7:29, ffc8:31, ffc9:30, ffca:26, ffcb:32, ffcc:43, ffcd:45, ffce:56, ffcf:42, ffd0:29, ffd1:23, ffd2:24, ffd3:41, ffd4:22, ffd5:29, ffd6:31, ffd7:28, ffd8:27, ffd9:27, ffda:30, ffdb:25, ffdc:49, ffdd:42, ffde:47, ffdf:54, ffe0:25, ffe1:31, ffe2:32, ffe3:32, ffe4:37, ffe5:36, ffe6:36, ffe7:30, ffe8:31, ffe9:44, ffea:24, ffeb:31, ffec:47, ffed:49, ffee:58, ffef:45, fff0:24, fff1:24, fff2:30, fff3:45, fff4:36, fff5:27, fff6:36, fff7:48, fff8:29, fff9:25, fffa:38, fffb:49, fffc:48, fffd:42, fffe:37, ffff:68
+  first markers at: [('0x307', '0xd2'), ('0x397', '0xb1'), ('0x428', '0xb0'), ('0x60f', '0xa0'), ('0x66c', '0x23'), ('0x691', '0x8d'), ('0x69e', '0x69'), ('0x79c', '0xd6'), ('0x827', '0x40'), ('0x8f4', '0x6a'), ('0x9fe', '0xa5'), ('0xa09', '0x88')]
+  comp[0:24]   : 000000000000000000000000000000000000000000000000
+  comp[-8:]    : f7efdfbf7efdfbf7
+  raw[504:544] : 00000000000000000000de521366dccd8cfe291a1c468992a578c2b0ad703f581c0b0667c07d2499
+  raw[-8:]     : dfbf7efdfbf7ffd9
+

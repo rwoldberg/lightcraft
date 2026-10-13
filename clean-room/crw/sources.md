@@ -95,3 +95,11 @@ checked out, diffed, logged or read.
   (`logs/structure-public.txt`) and the 18 private files
   (`logs/private/structure-private.txt`, gitignored — may contain personal metadata). Observed
   facts are summarised in `01-plan.md` §3. No raw-data decoding was attempted; statistics only.
+- 2026-10-12 ~20:0x — P0/P1 local analysis (post-approval): `02-container.md` written from the
+  already-logged sources + corpus observations. `p1_payload.py`, `p1b_markers.py`,
+  `p1c_lowbits_bounds.py` run over all 29 files (public logs `logs/p1*`, private under
+  `logs/private/`). Established statistically (no decoding): the three payload layouts, the
+  514-byte zero block at the compressed section start of every file, JPEG-style ff00 stuffing
+  of every entropy stream (zero exceptions), the PowerShot `ff d9` terminator, and the exact
+  low-bits region bounds on G5/G6. Documented in `03-payload-layout.md`. No external sources
+  consulted in this step.

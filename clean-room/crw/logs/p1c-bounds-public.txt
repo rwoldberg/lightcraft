@@ -1,0 +1,11 @@
+crw-canon-eos-10d-a.crw              EOS layout: lowbits [0:1629584) + zeros(514) + entropy; non-stuffed ff: 6241 total, 6241 in lowbits, 0 in entropy (expect 0)
+crw-canon-eos-10d-b.crw              EOS layout: lowbits [0:1629584) + zeros(514) + entropy; non-stuffed ff: 6503 total, 6503 in lowbits, 0 in entropy (expect 0)
+crw-canon-eos-10d-c.crw              EOS layout: lowbits [0:1629584) + zeros(514) + entropy; non-stuffed ff: 6139 total, 6139 in lowbits, 0 in entropy (expect 0)
+crw-canon-eos-300d-a.crw             EOS layout: lowbits [0:1629584) + zeros(514) + entropy; non-stuffed ff: 6418 total, 6418 in lowbits, 0 in entropy (expect 0)
+crw-canon-eos-300d-b.crw             EOS layout: lowbits [0:1629584) + zeros(514) + entropy; non-stuffed ff: 7180 total, 7180 in lowbits, 0 in entropy (expect 0)
+crw-canon-eos-d30.crw                EOS layout: lowbits [0:809536) + zeros(514) + entropy; non-stuffed ff: 3450 total, 3450 in lowbits, 0 in entropy (expect 0)
+crw-canon-eos-d60.crw                EOS layout: lowbits [0:1629584) + zeros(514) + entropy; non-stuffed ff: 6419 total, 6419 in lowbits, 0 in entropy (expect 0)
+crw-canon-eos-digital-rebel.crw      EOS layout: lowbits [0:1629584) + zeros(514) + entropy; non-stuffed ff: 23394 total, 23394 in lowbits, 0 in entropy (expect 0)
+crw-canon-powershot-g1.crw           PS 10-bit layout: zeros(514) + entropy; no non-stuffed ff (pure stuffed stream)
+crw-canon-powershot-g5.crw           PS 12-bit layout: zeros(514) + lowbits [514:1315138) + entropy; all 5002 non-stuffed ff inside lowbits; first 697, last 1315128
+crw-canon-powershot-g6.crw           PS 12-bit layout: zeros(514) + lowbits [514:1852274) + entropy; all 7928 non-stuffed ff inside lowbits; first 775, last 1852264

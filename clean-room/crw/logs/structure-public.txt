@@ -1,0 +1,887 @@
+== corpus/crw/crw-canon-eos-10d-a.crw
+  size 7787330, byteOrder II, headerLength 26, type b'HEAP' subType b'CCDR', version 0x00010002
+heap root: block @0x1a len 0x76d328, offsetTbl @+0x76d304, 3 records
+  [0] tag 0x2005 id 0x2005 RawData                struct heap  len 0x6cdcf6 off 0x0
+      RawData: 7134454 bytes, entropy 7.9776 bits/byte
+        first 2 KiB: entropy -0.000, top bytes 00:2048, zeros 2048, ff 0
+        middle 2 KiB: entropy 7.877, top bytes db:20, d3:16, b6:16, de:16, zeros 6, ff 3
+        last 2 KiB: entropy 7.882, top bytes ac:17, d4:17, 91:17, 6c:17, zeros 12, ff 4
+  [1] tag 0x2007 id 0x2007 JpgFromRaw             struct heap  len 0x9dde2 off 0x6cdcf6
+      starts with JPEG SOI
+  [2] tag 0x300a id 0x300a ImageProps             heap2  heap  len 0x182c off 0x76bad8
+  heap root/ImageProps: block @0x76baf2 len 0x182c, offsetTbl @+0x17a4, 13 records
+    [0] tag 0x5803 id 0x1803 ImageFormat            dword  inrec len 0x20001 off 0x41200000
+    [1] tag 0x1810 id 0x1810 ImageInfo              dword  heap  len 0x1c off 0xc
+        = u32 (3072, 2048, 1065353216, 0, 8, 24, 257)
+    [2] tag 0x500a id 0x100a TargetImageType        word   inrec len 0x3af0000 off 0x9b869aeb
+    [3] tag 0x5804 id 0x1804 RecordID               dword  inrec len 0x0 off 0xf5657a8
+    [4] tag 0x5817 id 0x1817 FileNumber             dword  inrec len 0x1af8f9 off 0xde23c13d
+    [5] tag 0x180e id 0x180e TimeStamp              dword  heap  len 0xc off 0x0
+        = u32 (1228574022, 0, 0)
+    [6] tag 0x0816 id 0x0816 OriginalFileName       ascii  heap  len 0x20 off 0x28
+        = b'CRW_7673.CRW'
+    [7] tag 0x0817 id 0x0817 ThumbnailFileName      ascii  heap  len 0x20 off 0x48
+        = b'CRW_7673.THM'
+    [8] tag 0x0805 id 0x0805 CanonFileDescription   ascii  heap  len 0x100 off 0x68
+    [9] tag 0x3003 id 0x3003 MeasuredInfo           heap2  heap  len 0x10 off 0x168
+    heap root/ImageProps/MeasuredInfo: block @0x76bc5a len 0x10, offsetTbl @+0x0, 1 records
+      [0] tag 0x5814 id 0x1814 MeasuredEV             dword  inrec len 0x40cc0000 off 0x70138c52
+    [10] tag 0x2804 id 0x2804 ImageDescription       heap1  heap  len 0x5a off 0x178
+    heap root/ImageProps/ImageDescription: block @0x76bc6a len 0x5a, offsetTbl @+0x40, 2 records
+      [0] tag 0x0805 id 0x0805 CanonFileDescription   ascii  heap  len 0x20 off 0x0
+          = b'EOS 10D CMOS RAW IMAGE'
+      [1] tag 0x0815 id 0x0815 CanonImageType         ascii  heap  len 0x20 off 0x20
+          = b'CRW:EOS 10D CMOS RAW IMAGE'
+    [11] tag 0x2807 id 0x2807 CameraObject           heap1  heap  len 0xb2 off 0x1d2
+    heap root/ImageProps/CameraObject: block @0x76bcc4 len 0xb2, offsetTbl @+0x8e, 3 records
+      [0] tag 0x0810 id 0x0810 OwnerName              ascii  heap  len 0x20 off 0x0
+          = b'Horst Kakuschke'
+      [1] tag 0x080a id 0x080a CanonRawMakeModel      ascii  heap  len 0x20 off 0x20
+          = b'Canon\x00Canon EOS 10D\x00:g\x8fZ\xb5k\xa7\xea\xca\xda|\x1a'
+      [2] tag 0x3004 id 0x3004 CameraSpecification    heap2  heap  len 0x4e off 0x40
+      heap root/ImageProps/CameraObject/CameraSpecification: block @0x76bd04 len 0x4e, offsetTbl @+0x20, 4 records
+        [0] tag 0x580b id 0x180b SerialNumber           dword  inrec len 0xdb7145a off 0xde776b76
+        [1] tag 0x501c id 0x101c BaseISO                word   inrec len 0x64 off 0x8762cef2
+        [2] tag 0x480d id 0x080d ?                      ascii  inrec len 0x415355 off 0xe63b7d8c
+        [3] tag 0x080b id 0x080b CanonFirmwareVersion   ascii  heap  len 0x20 off 0x0
+            = b'Firmware Version 2.0.1'
+    [12] tag 0x300b id 0x300b ExifInformation        heap2  heap  len 0x1520 off 0x284
+    heap root/ImageProps/ExifInformation: block @0x76bd76 len 0x1520, offsetTbl @+0x142a, 24 records
+      [0] tag 0x5028 id 0x1028 CanonFlashInfo         word   inrec len 0x64 off 0x0
+      [1] tag 0x5029 id 0x1029 CanonFocalLength       word   inrec len 0x180000 off 0x2620392
+      [2] tag 0x102a id 0x102a CanonShotInfo          word   heap  len 0x42 off 0x0
+      [3] tag 0x1093 id 0x1093 ?                      word   heap  len 0x12 off 0x42
+          = u16 (18, 0, 0, 0, 0, 0, 65535, 65535, 65535)
+      [4] tag 0x102d id 0x102d CanonCameraSettings    word   heap  len 0x5c off 0x54
+      [5] tag 0x0036 id 0x0036 ?                      byte   heap  len 0xe82 off 0xb0
+      [6] tag 0x5834 id 0x1834 CanonModelID           dword  inrec len 0x80000168 off 0x4f2612e3
+      [7] tag 0x1031 id 0x1031 SensorInfo             word   heap  len 0x22 off 0xf32
+          = u16 (34, 3152, 2068, 1, 1, 72, 16, 3143, 2063, 24, 224, 40, 1856, 0, 0, 0, 0)
+      [8] tag 0x1835 id 0x1835 DecoderTable           dword  heap  len 0x10 off 0xf54
+          = u32 (0, 0, 514, 5504868)
+      [9] tag 0x1038 id 0x1038 CanonAFInfo            word   heap  len 0x30 off 0xf64
+          = u16 (7, 7, 3072, 2048, 3072, 2048, 151, 151, 1014, 608, 0, 0, 0, 64928, 64522, 0, 0, 65030, 0, 506, 0, 0, 8, 65535)
+      [10] tag 0x1033 id 0x1033 CustomFunctions        word   heap  len 0x24 off 0xf94
+          = u16 (36, 256, 513, 768, 1024, 1280, 1536, 1792, 2048, 2304, 2560, 2818, 3072, 3328, 3584, 3841, 4097, 4352)
+      [11] tag 0x10c0 id 0x10c0 ?                      word   heap  len 0x1a off 0xfb8
+          = u16 (26, 288, 343, 343, 160, 231, 433, 433, 275, 154, 444, 444, 384)
+      [12] tag 0x10c1 id 0x10c1 ?                      word   heap  len 0x1a off 0xfd2
+          = u16 (26, 314, 364, 365, 165, 234, 428, 430, 262, 174, 484, 487, 412)
+      [13] tag 0x10c2 id 0x10c2 ?                      word   heap  len 0x374 off 0xfec
+      [14] tag 0x10aa id 0x10aa ?                      word   heap  len 0xa off 0x1360
+          = u16 (10, 418, 1021, 1027, 467)
+      [15] tag 0x10a8 id 0x10a8 ?                      word   heap  len 0x14 off 0x136a
+          = u16 (20, 4174, 5190, 7000, 6000, 3232, 3934, 6083, 5190, 5200)
+      [16] tag 0x10ad id 0x10ad ?                      word   heap  len 0x3e off 0x137e
+          = u16 (62, 21468, 8650, 7000, 6000, 5600, 5200, 4700, 4200, 3343, 1668, 64833, 65115, 65180, 65240, 65271, 65307, 65361, 65429, 64, 582, 65341, 65183, 65148, 65121, 65106, 65097, 65083, 65072, 65051, 65251)
+      [17] tag 0x10ae id 0x10ae ColorTemperature       word   heap  len 0x2 off 0x140e
+          = u16 (5200,)
+      [18] tag 0x10af id 0x10af ?                      word   heap  len 0x2 off 0x1410
+          = u16 (1024,)
+      [19] tag 0x10a9 id 0x10a9 ColorBalance           word   heap  len 0x52 off 0x13bc
+      [20] tag 0x10b4 id 0x10b4 ColorSpace             word   heap  len 0x2 off 0x1412
+          = u16 (1,)
+      [21] tag 0x10b5 id 0x10b5 RawJpgInfo             word   heap  len 0xa off 0x1414
+          = u16 (10, 2, 2, 1536, 1024)
+      [22] tag 0x1039 id 0x1039 ?                      word   heap  len 0x8 off 0x141e
+          = u16 (0, 159, 7, 112)
+      [23] tag 0x183b id 0x183b SerialNumberFormat     dword  heap  len 0x4 off 0x1426
+          = u32 (2415919104,)
+
+== corpus/crw/crw-canon-eos-10d-b.crw
+  size 10822040, byteOrder II, headerLength 26, type b'HEAP' subType b'CCDR', version 0x00010002
+heap root: block @0x1a len 0xa5217e, offsetTbl @+0xa5215a, 3 records
+  [0] tag 0x2005 id 0x2005 RawData                struct heap  len 0x6e8c3a off 0x0
+      RawData: 7244858 bytes, entropy 7.9718 bits/byte
+        first 2 KiB: entropy -0.000, top bytes 00:2048, zeros 2048, ff 0
+        middle 2 KiB: entropy 7.894, top bytes 8c:18, 23:17, 5b:16, 32:16, zeros 14, ff 2
+        last 2 KiB: entropy 7.824, top bytes 52:20, 8c:19, 84:19, 92:18, zeros 17, ff 2
+  [1] tag 0x2007 id 0x2007 JpgFromRaw             struct heap  len 0x367cf4 off 0x6e8c3a
+      starts with JPEG SOI
+  [2] tag 0x300a id 0x300a ImageProps             heap2  heap  len 0x182c off 0xa5092e
+  heap root/ImageProps: block @0xa50948 len 0x182c, offsetTbl @+0x17a4, 13 records
+    [0] tag 0x5803 id 0x1803 ImageFormat            dword  inrec len 0x20001 off 0x41200000
+    [1] tag 0x1810 id 0x1810 ImageInfo              dword  heap  len 0x1c off 0xc
+        = u32 (3072, 2048, 1065353216, 0, 8, 24, 257)
+    [2] tag 0x500a id 0x100a TargetImageType        word   inrec len 0x0 off 0x1
+    [3] tag 0x5804 id 0x1804 RecordID               dword  inrec len 0x0 off 0x80002400
+    [4] tag 0x5817 id 0x1817 FileNumber             dword  inrec len 0x127edf off 0x1001000
+    [5] tag 0x180e id 0x180e TimeStamp              dword  heap  len 0xc off 0x0
+        = u32 (1105175848, 0, 0)
+    [6] tag 0x0816 id 0x0816 OriginalFileName       ascii  heap  len 0x20 off 0x28
+        = b'CRW_2127.CRW'
+    [7] tag 0x0817 id 0x0817 ThumbnailFileName      ascii  heap  len 0x20 off 0x48
+        = b'CRW_2127.THM'
+    [8] tag 0x0805 id 0x0805 CanonFileDescription   ascii  heap  len 0x100 off 0x68
+    [9] tag 0x3003 id 0x3003 MeasuredInfo           heap2  heap  len 0x10 off 0x168
+    heap root/ImageProps/MeasuredInfo: block @0xa50ab0 len 0x10, offsetTbl @+0x0, 1 records
+      [0] tag 0x5814 id 0x1814 MeasuredEV             dword  inrec len 0x40a80000 off 0x0
+    [10] tag 0x2804 id 0x2804 ImageDescription       heap1  heap  len 0x5a off 0x178
+    heap root/ImageProps/ImageDescription: block @0xa50ac0 len 0x5a, offsetTbl @+0x40, 2 records
+      [0] tag 0x0805 id 0x0805 CanonFileDescription   ascii  heap  len 0x20 off 0x0
+          = b'EOS 10D CMOS RAW IMAGE'
+      [1] tag 0x0815 id 0x0815 CanonImageType         ascii  heap  len 0x20 off 0x20
+          = b'CRW:EOS 10D CMOS RAW IMAGE'
+    [11] tag 0x2807 id 0x2807 CameraObject           heap1  heap  len 0xb2 off 0x1d2
+    heap root/ImageProps/CameraObject: block @0xa50b1a len 0xb2, offsetTbl @+0x8e, 3 records
+      [0] tag 0x0810 id 0x0810 OwnerName              ascii  heap  len 0x20 off 0x0
+          = b'Bill Ferguson'
+      [1] tag 0x080a id 0x080a CanonRawMakeModel      ascii  heap  len 0x20 off 0x20
+          = b'Canon\x00Canon EOS 10D\x00\x00\x00\x00\x06\x00\x04 \x80\x01\x04'
+      [2] tag 0x3004 id 0x3004 CameraSpecification    heap2  heap  len 0x4e off 0x40
+      heap root/ImageProps/CameraObject/CameraSpecification: block @0xa50b5a len 0x4e, offsetTbl @+0x20, 4 records
+        [0] tag 0x580b id 0x180b SerialNumber           dword  inrec len 0x54ab324a off 0x200100
+        [1] tag 0x501c id 0x101c BaseISO                word   inrec len 0x64 off 0x1042
+        [2] tag 0x480d id 0x080d ?                      ascii  inrec len 0x415355 off 0x1000000
+        [3] tag 0x080b id 0x080b CanonFirmwareVersion   ascii  heap  len 0x20 off 0x0
+            = b'Firmware Version 2.0.1'
+    [12] tag 0x300b id 0x300b ExifInformation        heap2  heap  len 0x1520 off 0x284
+    heap root/ImageProps/ExifInformation: block @0xa50bcc len 0x1520, offsetTbl @+0x142a, 24 records
+      [0] tag 0x5028 id 0x1028 CanonFlashInfo         word   inrec len 0x64 off 0x0
+      [1] tag 0x5029 id 0x1029 CanonFocalLength       word   inrec len 0x550000 off 0x2620392
+      [2] tag 0x102a id 0x102a CanonShotInfo          word   heap  len 0x42 off 0x0
+      [3] tag 0x1093 id 0x1093 ?                      word   heap  len 0x12 off 0x42
+          = u16 (18, 0, 0, 0, 0, 0, 65535, 65535, 65535)
+      [4] tag 0x102d id 0x102d CanonCameraSettings    word   heap  len 0x5c off 0x54
+      [5] tag 0x0036 id 0x0036 ?                      byte   heap  len 0xe82 off 0xb0
+      [6] tag 0x5834 id 0x1834 CanonModelID           dword  inrec len 0x80000168 off 0x20
+      [7] tag 0x1031 id 0x1031 SensorInfo             word   heap  len 0x22 off 0xf32
+          = u16 (34, 3152, 2068, 1, 1, 72, 16, 3143, 2063, 24, 224, 40, 1856, 0, 0, 0, 0)
+      [8] tag 0x1835 id 0x1835 DecoderTable           dword  heap  len 0x10 off 0xf54
+          = u32 (2, 0, 514, 5615272)
+      [9] tag 0x1038 id 0x1038 CanonAFInfo            word   heap  len 0x30 off 0xf64
+          = u16 (7, 7, 3072, 2048, 3072, 2048, 151, 151, 1014, 608, 0, 0, 0, 64928, 64522, 0, 0, 65030, 0, 506, 0, 0, 31, 65535)
+      [10] tag 0x1033 id 0x1033 CustomFunctions        word   heap  len 0x24 off 0xf94
+          = u16 (36, 256, 513, 768, 1024, 1280, 1537, 1792, 2053, 2304, 2560, 2816, 3072, 3328, 3584, 3840, 4096, 4352)
+      [11] tag 0x10c0 id 0x10c0 ?                      word   heap  len 0x1a off 0xfb8
+          = u16 (26, 353, 375, 375, 177, 268, 431, 432, 285, 190, 476, 477, 428)
+      [12] tag 0x10c1 id 0x10c1 ?                      word   heap  len 0x1a off 0xfd2
+          = u16 (26, 326, 364, 365, 161, 254, 428, 430, 268, 186, 484, 487, 416)
+      [13] tag 0x10c2 id 0x10c2 ?                      word   heap  len 0x374 off 0xfec
+      [14] tag 0x10aa id 0x10aa ?                      word   heap  len 0xa off 0x1360
+          = u16 (10, 345, 1021, 1027, 1301)
+      [15] tag 0x10a8 id 0x10a8 ?                      word   heap  len 0x14 off 0x136a
+          = u16 (20, 4028, 5190, 7000, 6000, 3232, 3930, 6080, 2818, 5200)
+      [16] tag 0x10ad id 0x10ad ?                      word   heap  len 0x3e off 0x137e
+          = u16 (62, 21468, 8650, 7000, 6000, 5600, 5200, 4700, 4200, 3343, 1668, 64821, 65116, 65184, 65246, 65279, 65317, 65373, 65444, 83, 613, 65393, 65229, 65191, 65165, 65148, 65139, 65125, 65112, 65100, 65341)
+      [17] tag 0x10ae id 0x10ae ColorTemperature       word   heap  len 0x2 off 0x140e
+          = u16 (5200,)
+      [18] tag 0x10af id 0x10af ?                      word   heap  len 0x2 off 0x1410
+          = u16 (1024,)
+      [19] tag 0x10a9 id 0x10a9 ColorBalance           word   heap  len 0x52 off 0x13bc
+      [20] tag 0x10b4 id 0x10b4 ColorSpace             word   heap  len 0x2 off 0x1412
+          = u16 (1,)
+      [21] tag 0x10b5 id 0x10b5 RawJpgInfo             word   heap  len 0xa off 0x1414
+          = u16 (10, 3, 0, 3072, 2048)
+      [22] tag 0x1039 id 0x1039 ?                      word   heap  len 0x8 off 0x141e
+          = u16 (0, 159, 7, 112)
+      [23] tag 0x183b id 0x183b SerialNumberFormat     dword  heap  len 0x4 off 0x1426
+          = u32 (2415919104,)
+
+== corpus/crw/crw-canon-eos-10d-c.crw
+  size 10583702, byteOrder II, headerLength 26, type b'HEAP' subType b'CCDR', version 0x00010002
+heap root: block @0x1a len 0xa17e7c, offsetTbl @+0xa17e58, 3 records
+  [0] tag 0x2005 id 0x2005 RawData                struct heap  len 0x71c324 off 0x0
+      RawData: 7455524 bytes, entropy 7.9666 bits/byte
+        first 2 KiB: entropy -0.000, top bytes 00:2048, zeros 2048, ff 0
+        middle 2 KiB: entropy 7.847, top bytes 82:21, b2:18, 98:18, 84:18, zeros 15, ff 1
+        last 2 KiB: entropy 7.785, top bytes 08:23, 9c:20, 38:20, cc:20, zeros 7, ff 0
+  [1] tag 0x2007 id 0x2007 JpgFromRaw             struct heap  len 0x2fa308 off 0x71c324
+      starts with JPEG SOI
+  [2] tag 0x300a id 0x300a ImageProps             heap2  heap  len 0x182c off 0xa1662c
+  heap root/ImageProps: block @0xa16646 len 0x182c, offsetTbl @+0x17a4, 13 records
+    [0] tag 0x5803 id 0x1803 ImageFormat            dword  inrec len 0x20001 off 0x41200000
+    [1] tag 0x1810 id 0x1810 ImageInfo              dword  heap  len 0x1c off 0xc
+        = u32 (3072, 2048, 1065353216, 0, 8, 24, 257)
+    [2] tag 0x500a id 0x100a TargetImageType        word   inrec len 0x41020000 off 0xf2c31662
+    [3] tag 0x5804 id 0x1804 RecordID               dword  inrec len 0x0 off 0xc3af7160
+    [4] tag 0x5817 id 0x1817 FileNumber             dword  inrec len 0x12f557 off 0x777d1c94
+    [5] tag 0x180e id 0x180e TimeStamp              dword  heap  len 0xc off 0x0
+        = u32 (1109761444, 0, 0)
+    [6] tag 0x0816 id 0x0816 OriginalFileName       ascii  heap  len 0x20 off 0x28
+        = b'CRW_2455.CRW'
+    [7] tag 0x0817 id 0x0817 ThumbnailFileName      ascii  heap  len 0x20 off 0x48
+        = b'CRW_2455.THM'
+    [8] tag 0x0805 id 0x0805 CanonFileDescription   ascii  heap  len 0x100 off 0x68
+    [9] tag 0x3003 id 0x3003 MeasuredInfo           heap2  heap  len 0x10 off 0x168
+    heap root/ImageProps/MeasuredInfo: block @0xa167ae len 0x10, offsetTbl @+0x0, 1 records
+      [0] tag 0x5814 id 0x1814 MeasuredEV             dword  inrec len 0x41160000 off 0x9a0c5382
+    [10] tag 0x2804 id 0x2804 ImageDescription       heap1  heap  len 0x5a off 0x178
+    heap root/ImageProps/ImageDescription: block @0xa167be len 0x5a, offsetTbl @+0x40, 2 records
+      [0] tag 0x0805 id 0x0805 CanonFileDescription   ascii  heap  len 0x20 off 0x0
+          = b'EOS 10D CMOS RAW IMAGE'
+      [1] tag 0x0815 id 0x0815 CanonImageType         ascii  heap  len 0x20 off 0x20
+          = b'CRW:EOS 10D CMOS RAW IMAGE'
+    [11] tag 0x2807 id 0x2807 CameraObject           heap1  heap  len 0xb2 off 0x1d2
+    heap root/ImageProps/CameraObject: block @0xa16818 len 0xb2, offsetTbl @+0x8e, 3 records
+      [0] tag 0x0810 id 0x0810 OwnerName              ascii  heap  len 0x20 off 0x0
+          = b'Bill Ferguson'
+      [1] tag 0x080a id 0x080a CanonRawMakeModel      ascii  heap  len 0x20 off 0x20
+          = b'Canon\x00Canon EOS 10D\x00\xfe\x19g\xba1\x94E\x02\x1cc(\xca'
+      [2] tag 0x3004 id 0x3004 CameraSpecification    heap2  heap  len 0x4e off 0x40
+      heap root/ImageProps/CameraObject/CameraSpecification: block @0xa16858 len 0x4e, offsetTbl @+0x20, 4 records
+        [0] tag 0x580b id 0x180b SerialNumber           dword  inrec len 0x54ab324a off 0x18e17812
+        [1] tag 0x501c id 0x101c BaseISO                word   inrec len 0x64 off 0xd734ef03
+        [2] tag 0x480d id 0x080d ?                      ascii  inrec len 0x415355 off 0x70fc1863
+        [3] tag 0x080b id 0x080b CanonFirmwareVersion   ascii  heap  len 0x20 off 0x0
+            = b'Firmware Version 2.0.1'
+    [12] tag 0x300b id 0x300b ExifInformation        heap2  heap  len 0x1520 off 0x284
+    heap root/ImageProps/ExifInformation: block @0xa168ca len 0x1520, offsetTbl @+0x142a, 24 records
+      [0] tag 0x5028 id 0x1028 CanonFlashInfo         word   inrec len 0x64 off 0x0
+      [1] tag 0x5029 id 0x1029 CanonFocalLength       word   inrec len 0x180000 off 0x2620392
+      [2] tag 0x102a id 0x102a CanonShotInfo          word   heap  len 0x42 off 0x0
+      [3] tag 0x1093 id 0x1093 ?                      word   heap  len 0x12 off 0x42
+          = u16 (18, 0, 0, 0, 0, 0, 65535, 65535, 65535)
+      [4] tag 0x102d id 0x102d CanonCameraSettings    word   heap  len 0x5c off 0x54
+      [5] tag 0x0036 id 0x0036 ?                      byte   heap  len 0xe82 off 0xb0
+      [6] tag 0x5834 id 0x1834 CanonModelID           dword  inrec len 0x80000168 off 0x1ba7180e
+      [7] tag 0x1031 id 0x1031 SensorInfo             word   heap  len 0x22 off 0xf32
+          = u16 (34, 3152, 2068, 1, 1, 72, 16, 3143, 2063, 24, 224, 40, 1856, 0, 0, 0, 0)
+      [8] tag 0x1835 id 0x1835 DecoderTable           dword  heap  len 0x10 off 0xf54
+          = u32 (2, 0, 514, 5825938)
+      [9] tag 0x1038 id 0x1038 CanonAFInfo            word   heap  len 0x30 off 0xf64
+          = u16 (7, 7, 3072, 2048, 3072, 2048, 151, 151, 1014, 608, 0, 0, 0, 64928, 64522, 0, 0, 65030, 0, 506, 0, 0, 113, 65535)
+      [10] tag 0x1033 id 0x1033 CustomFunctions        word   heap  len 0x24 off 0xf94
+          = u16 (36, 256, 513, 768, 1024, 1280, 1537, 1792, 2053, 2304, 2560, 2816, 3072, 3328, 3584, 3840, 4096, 4352)
+      [11] tag 0x10c0 id 0x10c0 ?                      word   heap  len 0x1a off 0xfb8
+          = u16 (26, 353, 375, 375, 177, 268, 431, 432, 285, 190, 476, 477, 428)
+      [12] tag 0x10c1 id 0x10c1 ?                      word   heap  len 0x1a off 0xfd2
+          = u16 (26, 326, 364, 365, 161, 254, 428, 430, 268, 186, 484, 487, 416)
+      [13] tag 0x10c2 id 0x10c2 ?                      word   heap  len 0x374 off 0xfec
+      [14] tag 0x10aa id 0x10aa ?                      word   heap  len 0xa off 0x1360
+          = u16 (10, 508, 1021, 1027, 856)
+      [15] tag 0x10a8 id 0x10a8 ?                      word   heap  len 0x14 off 0x136a
+          = u16 (20, 5347, 5190, 7000, 6000, 3232, 3930, 6080, 2818, 5200)
+      [16] tag 0x10ad id 0x10ad ?                      word   heap  len 0x3e off 0x137e
+          = u16 (62, 21468, 8650, 7000, 6000, 5600, 5200, 4700, 4200, 3343, 1668, 64821, 65116, 65184, 65246, 65279, 65317, 65373, 65444, 83, 613, 65393, 65229, 65191, 65165, 65148, 65139, 65125, 65112, 65100, 65341)
+      [17] tag 0x10ae id 0x10ae ColorTemperature       word   heap  len 0x2 off 0x140e
+          = u16 (5200,)
+      [18] tag 0x10af id 0x10af ?                      word   heap  len 0x2 off 0x1410
+          = u16 (1024,)
+      [19] tag 0x10a9 id 0x10a9 ColorBalance           word   heap  len 0x52 off 0x13bc
+      [20] tag 0x10b4 id 0x10b4 ColorSpace             word   heap  len 0x2 off 0x1412
+          = u16 (1,)
+      [21] tag 0x10b5 id 0x10b5 RawJpgInfo             word   heap  len 0xa off 0x1414
+          = u16 (10, 3, 0, 3072, 2048)
+      [22] tag 0x1039 id 0x1039 ?                      word   heap  len 0x8 off 0x141e
+          = u16 (0, 159, 7, 112)
+      [23] tag 0x183b id 0x183b SerialNumberFormat     dword  heap  len 0x4 off 0x1426
+          = u32 (2415919104,)
+
+== corpus/crw/crw-canon-eos-300d-a.crw
+  size 9056348, byteOrder II, headerLength 26, type b'HEAP' subType b'CCDR', version 0x00010002
+heap root: block @0x1a len 0x8a3042, offsetTbl @+0x8a301e, 3 records
+  [0] tag 0x2005 id 0x2005 RawData                struct heap  len 0x69bce6 off 0x0
+      RawData: 6929638 bytes, entropy 7.9804 bits/byte
+        first 2 KiB: entropy -0.000, top bytes 00:2048, zeros 2048, ff 0
+        middle 2 KiB: entropy 7.886, top bytes bb:21, 9c:20, 8c:17, 18:14, zeros 13, ff 10
+        last 2 KiB: entropy 7.850, top bytes ae:20, bb:18, e3:18, 6e:18, zeros 7, ff 4
+  [1] tag 0x2007 id 0x2007 JpgFromRaw             struct heap  len 0x205b64 off 0x69bce6
+      starts with JPEG SOI
+  [2] tag 0x300a id 0x300a ImageProps             heap2  heap  len 0x17d4 off 0x8a184a
+  heap root/ImageProps: block @0x8a1864 len 0x17d4, offsetTbl @+0x174c, 13 records
+    [0] tag 0x5803 id 0x1803 ImageFormat            dword  inrec len 0x20001 off 0x41200000
+    [1] tag 0x1810 id 0x1810 ImageInfo              dword  heap  len 0x1c off 0x0
+        = u32 (3072, 2048, 1065353216, 270, 8, 24, 257)
+    [2] tag 0x500a id 0x100a TargetImageType        word   inrec len 0x9ceb0000 off 0xc97abdef
+    [3] tag 0x5804 id 0x1804 RecordID               dword  inrec len 0x0 off 0xb1dab4b5
+    [4] tag 0x5817 id 0x1817 FileNumber             dword  inrec len 0xfb8bd off 0x0
+    [5] tag 0x180e id 0x180e TimeStamp              dword  heap  len 0xc off 0x1c
+        = u32 (1083408238, 0, 0)
+    [6] tag 0x0816 id 0x0816 OriginalFileName       ascii  heap  len 0x20 off 0x28
+        = b'CRW_0333.CRW'
+    [7] tag 0x0817 id 0x0817 ThumbnailFileName      ascii  heap  len 0x20 off 0x48
+        = b'CRW_0333.THM'
+    [8] tag 0x0805 id 0x0805 CanonFileDescription   ascii  heap  len 0x100 off 0x68
+    [9] tag 0x3003 id 0x3003 MeasuredInfo           heap2  heap  len 0x10 off 0x168
+    heap root/ImageProps/MeasuredInfo: block @0x8a19cc len 0x10, offsetTbl @+0x0, 1 records
+      [0] tag 0x5814 id 0x1814 MeasuredEV             dword  inrec len 0x41100000 off 0xf5e6df2f
+    [10] tag 0x2804 id 0x2804 ImageDescription       heap1  heap  len 0x58 off 0x178
+    heap root/ImageProps/ImageDescription: block @0x8a19dc len 0x58, offsetTbl @+0x3e, 2 records
+      [0] tag 0x0805 id 0x0805 CanonFileDescription   ascii  heap  len 0x20 off 0x0
+          = b'EOS 300D DIGITAL CMOS RAW'
+      [1] tag 0x0815 id 0x0815 CanonImageType         ascii  heap  len 0x1e off 0x20
+          = b'CRW:EOS 300D DIGITAL CMOS RAW'
+    [11] tag 0x2807 id 0x2807 CameraObject           heap1  heap  len 0x8a off 0x1d0
+    heap root/ImageProps/CameraObject: block @0x8a1a34 len 0x8a, offsetTbl @+0x66, 3 records
+      [0] tag 0x0810 id 0x0810 OwnerName              ascii  heap  len 0x1 off 0x0
+          = b''
+      [1] tag 0x080a id 0x080a CanonRawMakeModel      ascii  heap  len 0x1d off 0x2
+          = b'Canon\x00Canon EOS 300D DIGITAL'
+      [2] tag 0x3004 id 0x3004 CameraSpecification    heap2  heap  len 0x46 off 0x20
+      heap root/ImageProps/CameraObject/CameraSpecification: block @0x8a1a54 len 0x46, offsetTbl @+0x18, 4 records
+        [0] tag 0x580b id 0x180b SerialNumber           dword  inrec len 0x3d6b01d9 off 0x8afd725d
+        [1] tag 0x501c id 0x101c BaseISO                word   inrec len 0x64 off 0xe53a2db9
+        [2] tag 0x480d id 0x080d ?                      ascii  inrec len 0x415355 off 0x6efb17d7
+        [3] tag 0x080b id 0x080b CanonFirmwareVersion   ascii  heap  len 0x17 off 0x0
+            = b'Firmware Version 1.1.1'
+    [12] tag 0x300b id 0x300b ExifInformation        heap2  heap  len 0x14f2 off 0x25a
+    heap root/ImageProps/ExifInformation: block @0x8a1abe len 0x14f2, offsetTbl @+0x1406, 23 records
+      [0] tag 0x5028 id 0x1028 CanonFlashInfo         word   inrec len 0x64 off 0x0
+      [1] tag 0x5029 id 0x1029 CanonFocalLength       word   inrec len 0x460000 off 0x2620392
+      [2] tag 0x102a id 0x102a CanonShotInfo          word   heap  len 0x42 off 0x0
+      [3] tag 0x1093 id 0x1093 ?                      word   heap  len 0x12 off 0x42
+          = u16 (18, 0, 0, 0, 0, 0, 65535, 65535, 65535)
+      [4] tag 0x102d id 0x102d CanonCameraSettings    word   heap  len 0x5c off 0x54
+      [5] tag 0x0036 id 0x0036 ?                      byte   heap  len 0xe82 off 0xb0
+      [6] tag 0x5834 id 0x1834 CanonModelID           dword  inrec len 0x80000170 off 0x79d599bf
+      [7] tag 0x1031 id 0x1031 SensorInfo             word   heap  len 0x22 off 0xf32
+          = u16 (34, 3152, 2068, 1, 1, 72, 16, 3143, 2063, 24, 224, 40, 1856, 0, 0, 0, 0)
+      [8] tag 0x1835 id 0x1835 DecoderTable           dword  heap  len 0x10 off 0xf54
+          = u32 (0, 0, 514, 5300052)
+      [9] tag 0x1038 id 0x1038 CanonAFInfo            word   heap  len 0x30 off 0xf64
+          = u16 (48, 7, 3072, 2048, 3072, 2048, 151, 151, 1014, 608, 0, 0, 0, 64928, 64522, 0, 0, 65030, 0, 506, 0, 0, 8, 65535)
+      [10] tag 0x10c0 id 0x10c0 ?                      word   heap  len 0x1a off 0xf94
+          = u16 (26, 334, 372, 372, 175, 246, 427, 427, 279, 185, 488, 490, 443)
+      [11] tag 0x10c1 id 0x10c1 ?                      word   heap  len 0x1a off 0xfae
+          = u16 (26, 297, 375, 375, 168, 203, 394, 395, 244, 153, 453, 454, 388)
+      [12] tag 0x10c2 id 0x10c2 ?                      word   heap  len 0x374 off 0xfc8
+      [13] tag 0x10aa id 0x10aa ?                      word   heap  len 0xa off 0x133c
+          = u16 (10, 489, 1022, 1026, 668)
+      [14] tag 0x10a8 id 0x10a8 ?                      word   heap  len 0x14 off 0x1346
+          = u16 (20, 4709, 5200, 6983, 5987, 3213, 3888, 6196, 2500, 5190)
+      [15] tag 0x10ad id 0x10ad ?                      word   heap  len 0x3e off 0x135a
+          = u16 (62, 20127, 8480, 7000, 6000, 5600, 5200, 4724, 4200, 3266, 1446, 64813, 65123, 65187, 65248, 65281, 65320, 65371, 65446, 114, 674, 65436, 65225, 65196, 65169, 65152, 65137, 65124, 65112, 65098, 65348)
+      [16] tag 0x10ae id 0x10ae ColorTemperature       word   heap  len 0x2 off 0x1398
+          = u16 (5200,)
+      [17] tag 0x10af id 0x10af ?                      word   heap  len 0x2 off 0x139a
+          = u16 (1024,)
+      [18] tag 0x10a9 id 0x10a9 ColorBalance           word   heap  len 0x52 off 0x139c
+      [19] tag 0x10b4 id 0x10b4 ColorSpace             word   heap  len 0x2 off 0x13ee
+          = u16 (1,)
+      [20] tag 0x10b5 id 0x10b5 RawJpgInfo             word   heap  len 0xa off 0x13f0
+          = u16 (10, 3, 1, 2048, 1360)
+      [21] tag 0x1039 id 0x1039 ?                      word   heap  len 0x8 off 0x13fa
+          = u16 (0, 159, 7, 112)
+      [22] tag 0x183b id 0x183b SerialNumberFormat     dword  heap  len 0x4 off 0x1402
+          = u32 (2415919104,)
+
+== corpus/crw/crw-canon-eos-300d-b.crw
+  size 8389842, byteOrder II, headerLength 26, type b'HEAP' subType b'CCDR', version 0x00010002
+heap root: block @0x1a len 0x8004b8, offsetTbl @+0x800494, 3 records
+  [0] tag 0x2005 id 0x2005 RawData                struct heap  len 0x6df56a off 0x0
+      RawData: 7206250 bytes, entropy 7.9810 bits/byte
+        first 2 KiB: entropy -0.000, top bytes 00:2048, zeros 2048, ff 0
+        middle 2 KiB: entropy 7.903, top bytes d7:20, 7b:18, 32:17, 83:16, zeros 14, ff 6
+        last 2 KiB: entropy 7.840, top bytes 00:29, ff:23, fc:21, af:20, zeros 29, ff 23
+  [1] tag 0x2007 id 0x2007 JpgFromRaw             struct heap  len 0x11f72c off 0x6df56a
+      starts with JPEG SOI
+  [2] tag 0x300a id 0x300a ImageProps             heap2  heap  len 0x17fe off 0x7fec96
+  heap root/ImageProps: block @0x7fecb0 len 0x17fe, offsetTbl @+0x1776, 13 records
+    [0] tag 0x5803 id 0x1803 ImageFormat            dword  inrec len 0x20001 off 0x41200000
+    [1] tag 0x1810 id 0x1810 ImageInfo              dword  heap  len 0x1c off 0xc
+        = u32 (3072, 2048, 1065353216, 270, 8, 24, 257)
+    [2] tag 0x500a id 0x100a TargetImageType        word   inrec len 0x17890000 off 0x637f057b
+    [3] tag 0x5804 id 0x1804 RecordID               dword  inrec len 0x0 off 0x9cae3253
+    [4] tag 0x5817 id 0x1817 FileNumber             dword  inrec len 0x2b4f7b off 0x7aaebd64
+    [5] tag 0x180e id 0x180e TimeStamp              dword  heap  len 0xc off 0x0
+        = u32 (1182188238, 0, 0)
+    [6] tag 0x0816 id 0x0816 OriginalFileName       ascii  heap  len 0x20 off 0x28
+        = b'CRW_8395.CRW'
+    [7] tag 0x0817 id 0x0817 ThumbnailFileName      ascii  heap  len 0x20 off 0x48
+        = b'CRW_8395.THM'
+    [8] tag 0x0805 id 0x0805 CanonFileDescription   ascii  heap  len 0x100 off 0x68
+    [9] tag 0x3003 id 0x3003 MeasuredInfo           heap2  heap  len 0x10 off 0x168
+    heap root/ImageProps/MeasuredInfo: block @0x7fee18 len 0x10, offsetTbl @+0x0, 1 records
+      [0] tag 0x5814 id 0x1814 MeasuredEV             dword  inrec len 0x41040000 off 0xde864d39
+    [10] tag 0x2804 id 0x2804 ImageDescription       heap1  heap  len 0x5a off 0x178
+    heap root/ImageProps/ImageDescription: block @0x7fee28 len 0x5a, offsetTbl @+0x40, 2 records
+      [0] tag 0x0805 id 0x0805 CanonFileDescription   ascii  heap  len 0x20 off 0x0
+          = b'EOS 300D DIGITAL CMOS RAW'
+      [1] tag 0x0815 id 0x0815 CanonImageType         ascii  heap  len 0x20 off 0x20
+          = b'CRW:EOS 300D DIGITAL CMOS RAW'
+    [11] tag 0x2807 id 0x2807 CameraObject           heap1  heap  len 0xb2 off 0x1d2
+    heap root/ImageProps/CameraObject: block @0x7fee82 len 0xb2, offsetTbl @+0x8e, 3 records
+      [0] tag 0x0810 id 0x0810 OwnerName              ascii  heap  len 0x20 off 0x0
+          = b''
+      [1] tag 0x080a id 0x080a CanonRawMakeModel      ascii  heap  len 0x20 off 0x20
+          = b'Canon\x00Canon EOS 300D DIGITAL\x00\x97\xd4\xc4'
+      [2] tag 0x3004 id 0x3004 CameraSpecification    heap2  heap  len 0x4e off 0x40
+      heap root/ImageProps/CameraObject/CameraSpecification: block @0x7feec2 len 0x4e, offsetTbl @+0x20, 4 records
+        [0] tag 0x580b id 0x180b SerialNumber           dword  inrec len 0x3d6aecf7 off 0x46ec30fc
+        [1] tag 0x501c id 0x101c BaseISO                word   inrec len 0x64 off 0x5aa35384
+        [2] tag 0x480d id 0x080d ?                      ascii  inrec len 0x415355 off 0xf1421364
+        [3] tag 0x080b id 0x080b CanonFirmwareVersion   ascii  heap  len 0x20 off 0x0
+            = b'Firmware Version 1.1.1'
+    [12] tag 0x300b id 0x300b ExifInformation        heap2  heap  len 0x14f2 off 0x284
+    heap root/ImageProps/ExifInformation: block @0x7fef34 len 0x14f2, offsetTbl @+0x1406, 23 records
+      [0] tag 0x5028 id 0x1028 CanonFlashInfo         word   inrec len 0x64 off 0x0
+      [1] tag 0x5029 id 0x1029 CanonFocalLength       word   inrec len 0x150000 off 0x2620392
+      [2] tag 0x102a id 0x102a CanonShotInfo          word   heap  len 0x42 off 0x0
+      [3] tag 0x1093 id 0x1093 ?                      word   heap  len 0x12 off 0x42
+          = u16 (18, 0, 0, 0, 0, 0, 65535, 65535, 65535)
+      [4] tag 0x102d id 0x102d CanonCameraSettings    word   heap  len 0x5c off 0x54
+      [5] tag 0x0036 id 0x0036 ?                      byte   heap  len 0xe82 off 0xb0
+      [6] tag 0x5834 id 0x1834 CanonModelID           dword  inrec len 0x80000170 off 0xedbad5b1
+      [7] tag 0x1031 id 0x1031 SensorInfo             word   heap  len 0x22 off 0xf32
+          = u16 (34, 3152, 2068, 1, 1, 72, 16, 3143, 2063, 24, 224, 40, 1856, 0, 0, 0, 0)
+      [8] tag 0x1835 id 0x1835 DecoderTable           dword  heap  len 0x10 off 0xf54
+          = u32 (2, 0, 514, 5576664)
+      [9] tag 0x1038 id 0x1038 CanonAFInfo            word   heap  len 0x30 off 0xf64
+          = u16 (7, 7, 3072, 2048, 3072, 2048, 151, 151, 1014, 608, 0, 0, 0, 64928, 64522, 0, 0, 65030, 0, 506, 0, 0, 36, 65535)
+      [10] tag 0x10c0 id 0x10c0 ?                      word   heap  len 0x1a off 0xf94
+          = u16 (26, 328, 374, 372, 163, 244, 430, 428, 262, 162, 436, 435, 366)
+      [11] tag 0x10c1 id 0x10c1 ?                      word   heap  len 0x1a off 0xfae
+          = u16 (26, 301, 375, 375, 166, 206, 394, 395, 242, 155, 453, 454, 383)
+      [12] tag 0x10c2 id 0x10c2 ?                      word   heap  len 0x374 off 0xfc8
+      [13] tag 0x10aa id 0x10aa ?                      word   heap  len 0xa off 0x133c
+          = u16 (10, 314, 1022, 1026, 1095)
+      [14] tag 0x10a8 id 0x10a8 ?                      word   heap  len 0x14 off 0x1346
+          = u16 (20, 5781, 5200, 7000, 5975, 3211, 3882, 6203, 4166, 5190)
+      [15] tag 0x10ad id 0x10ad ?                      word   heap  len 0x3e off 0x135a
+          = u16 (62, 20127, 8480, 7000, 6000, 5600, 5200, 4724, 4200, 3266, 1446, 64849, 65150, 65212, 65271, 65304, 65342, 65392, 65464, 125, 664, 65367, 65170, 65143, 65117, 65102, 65088, 65078, 65068, 65055, 65302)
+      [16] tag 0x10ae id 0x10ae ColorTemperature       word   heap  len 0x2 off 0x13ea
+          = u16 (5200,)
+      [17] tag 0x10af id 0x10af ?                      word   heap  len 0x2 off 0x13ec
+          = u16 (1024,)
+      [18] tag 0x10a9 id 0x10a9 ColorBalance           word   heap  len 0x52 off 0x1398
+      [19] tag 0x10b4 id 0x10b4 ColorSpace             word   heap  len 0x2 off 0x13ee
+          = u16 (2,)
+      [20] tag 0x10b5 id 0x10b5 RawJpgInfo             word   heap  len 0xa off 0x13f0
+          = u16 (10, 3, 2, 1536, 1024)
+      [21] tag 0x1039 id 0x1039 ?                      word   heap  len 0x8 off 0x13fa
+          = u16 (0, 159, 7, 112)
+      [22] tag 0x183b id 0x183b SerialNumberFormat     dword  heap  len 0x4 off 0x1402
+          = u32 (2415919104,)
+
+== corpus/crw/crw-canon-eos-d30.crw
+  size 2993260, byteOrder II, headerLength 26, type b'HEAP' subType b'CCDR', version 0x00010002
+heap root: block @0x1a len 0x2dac52, offsetTbl @+0x2dac2e, 3 records
+  [0] tag 0x2005 id 0x2005 RawData                struct heap  len 0x2b19c8 off 0x0
+      RawData: 2824648 bytes, entropy 7.9671 bits/byte
+        first 2 KiB: entropy 7.540, top bytes ef:35, fb:34, ae:33, bf:31, zeros 1, ff 24
+        middle 2 KiB: entropy 7.835, top bytes ac:21, 95:19, b6:18, ab:18, zeros 11, ff 3
+        last 2 KiB: entropy 7.792, top bytes 02:22, 4c:21, 00:20, 26:19, zeros 20, ff 2
+  [1] tag 0x2007 id 0x2007 JpgFromRaw             struct heap  len 0x28128 off 0x2b19c8
+      starts with JPEG SOI
+  [2] tag 0x300a id 0x300a ImageProps             heap2  heap  len 0x113e off 0x2d9af0
+  heap root/ImageProps: block @0x2d9b0a len 0x113e, offsetTbl @+0x10b6, 13 records
+    [0] tag 0x5803 id 0x1803 ImageFormat            dword  inrec len 0x20001 off 0x41200000
+    [1] tag 0x1810 id 0x1810 ImageInfo              dword  heap  len 0x1c off 0xc
+        = u32 (2160, 1440, 1065353216, 0, 8, 24, 257)
+    [2] tag 0x500a id 0x100a TargetImageType        word   inrec len 0xc0200000 off 0x130000
+    [3] tag 0x5804 id 0x1804 RecordID               dword  inrec len 0x0 off 0x2108c00
+    [4] tag 0x5817 id 0x1817 FileNumber             dword  inrec len 0x22378c off 0x7400000
+    [5] tag 0x180e id 0x180e TimeStamp              dword  heap  len 0xc off 0x0
+        = u32 (1482512730, 0, 0)
+    [6] tag 0x0816 id 0x0816 OriginalFileName       ascii  heap  len 0x20 off 0x28
+        = b'CRW_2444.CRW\x00\x9a\x02]G\x18\xa6JG\xff\x80 H\x00@\x00\x02\x82'
+    [7] tag 0x0817 id 0x0817 ThumbnailFileName      ascii  heap  len 0x20 off 0x48
+        = b'CRW_2444.THM\x00\x04\x04\x010\x02\x00\x80\x00\x00\x00@\x12\x14\x00\x00\x00 '
+    [8] tag 0x0805 id 0x0805 CanonFileDescription   ascii  heap  len 0x100 off 0x68
+    [9] tag 0x3003 id 0x3003 MeasuredInfo           heap2  heap  len 0x10 off 0x168
+    heap root/ImageProps/MeasuredInfo: block @0x2d9c72 len 0x10, offsetTbl @+0x0, 1 records
+      [0] tag 0x5814 id 0x1814 MeasuredEV             dword  inrec len 0xbec00000 off 0xedfff6ff
+    [10] tag 0x2804 id 0x2804 ImageDescription       heap1  heap  len 0x5a off 0x178
+    heap root/ImageProps/ImageDescription: block @0x2d9c82 len 0x5a, offsetTbl @+0x40, 2 records
+      [0] tag 0x0805 id 0x0805 CanonFileDescription   ascii  heap  len 0x20 off 0x0
+          = b'EOS D30 CMOS RAW IMAGE\x00\xff\x9f\xff\xfd\xf7\xfd\xfd\xff\xff'
+      [1] tag 0x0815 id 0x0815 CanonImageType         ascii  heap  len 0x20 off 0x20
+          = b'CRW:EOS D30 CMOS RAW IMAGE\x00\xdf\xff\xde\xff\xff'
+    [11] tag 0x2807 id 0x2807 CameraObject           heap1  heap  len 0xb2 off 0x1d2
+    heap root/ImageProps/CameraObject: block @0x2d9cdc len 0xb2, offsetTbl @+0x8e, 3 records
+      [0] tag 0x0810 id 0x0810 OwnerName              ascii  heap  len 0x20 off 0x0
+          = b'\x00\xdf\xfb\xff\xff\xff\xb5\xef\xff\xff_\xef\xff\xdf\xef\xfb\xff\xff\xff\xfb\xff\xff{\xff\xfe\xff\xff\x7f\xfd?\xdf\xff'
+      [1] tag 0x080a id 0x080a CanonRawMakeModel      ascii  heap  len 0x20 off 0x20
+          = b'Canon\x00Canon EOS D30\x00\x00\xff\xff\xff\xff\xff\x7f\xbf\xfd\xff\xffo'
+      [2] tag 0x3004 id 0x3004 CameraSpecification    heap2  heap  len 0x4e off 0x40
+      heap root/ImageProps/CameraObject/CameraSpecification: block @0x2d9d1c len 0x4e, offsetTbl @+0x20, 4 records
+        [0] tag 0x580b id 0x180b SerialNumber           dword  inrec len 0x172700aa off 0xfffaffff
+        [1] tag 0x501c id 0x101c BaseISO                word   inrec len 0x64 off 0xfffff1ff
+        [2] tag 0x480d id 0x080d ?                      ascii  inrec len 0x415355 off 0xffffff5f
+        [3] tag 0x080b id 0x080b CanonFirmwareVersion   ascii  heap  len 0x20 off 0x0
+            = b'Firmware Version 1.02\x00\xbf\xff\xff\xff\xe7\xff\xff\xdf\xff}'
+    [12] tag 0x300b id 0x300b ExifInformation        heap2  heap  len 0xe32 off 0x284
+    heap root/ImageProps/ExifInformation: block @0x2d9d8e len 0xe32, offsetTbl @+0xdaa, 13 records
+      [0] tag 0x0001 id 0x0001 FreeBytes              byte   heap  len 0xc off 0x0
+      [1] tag 0x5028 id 0x1028 CanonFlashInfo         word   inrec len 0x64 off 0x400048
+      [2] tag 0x5029 id 0x1029 CanonFocalLength       word   inrec len 0x320000 off 0x2620392
+      [3] tag 0x102a id 0x102a CanonShotInfo          word   heap  len 0x32 off 0xc
+          = u16 (50, 0, 288, 65484, 31, 181, 0, 0, 3, 1, 8, 8, 0, 0, 12290, 0, 0, 0, 1, 0, 0, 32, 180, 75, 0)
+      [4] tag 0x102d id 0x102d CanonCameraSettings    word   heap  len 0x40 off 0x3e
+          = u16 (64, 2, 0, 4, 0, 1, 0, 0, 0, 2, 0, 1, 0, 0, 0, 0, 0, 5, 2, 12291, 4, 0, 198, 50, 50, 1, 31, 285, 255, 0, 0, 0)
+      [5] tag 0x102c id 0x102c CanonColorInfo2        word   heap  len 0x100 off 0x7e
+      [6] tag 0x0032 id 0x0032 ?                      byte   heap  len 0x300 off 0x17e
+      [7] tag 0x0036 id 0x0036 ?                      byte   heap  len 0x868 off 0x47e
+      [8] tag 0x1030 id 0x1030 WhiteSample            word   heap  len 0x76 off 0xce6
+      [9] tag 0x5834 id 0x1834 CanonModelID           dword  inrec len 0x1140000 off 0x400c
+      [10] tag 0x1031 id 0x1031 SensorInfo             word   heap  len 0x22 off 0xd5c
+          = u16 (34, 2224, 1456, 1, 0, 56, 12, 2215, 1451, 8, 220, 40, 1244, 0, 0, 0, 0)
+      [11] tag 0x1835 id 0x1835 DecoderTable           dword  heap  len 0x10 off 0xd7e
+          = u32 (1, 0, 514, 2015110)
+      [12] tag 0x1033 id 0x1033 CustomFunctions        word   heap  len 0x1c off 0xd8e
+          = u16 (28, 256, 514, 768, 1025, 1280, 1536, 1794, 2049, 2305, 2560, 2816, 3074, 3328)
+
+== corpus/crw/crw-canon-eos-d60.crw
+  size 8591234, byteOrder II, headerLength 26, type b'HEAP' subType b'CCDR', version 0x00010002
+heap root: block @0x1a len 0x831768, offsetTbl @+0x831744, 3 records
+  [0] tag 0x2005 id 0x2005 RawData                struct heap  len 0x662502 off 0x0
+      RawData: 6694146 bytes, entropy 7.9868 bits/byte
+        first 2 KiB: entropy -0.000, top bytes 00:2048, zeros 2048, ff 0
+        middle 2 KiB: entropy 7.864, top bytes 8c:25, cb:21, 5d:18, 63:17, zeros 11, ff 4
+        last 2 KiB: entropy 7.890, top bytes f1:16, 6d:16, 76:16, 55:15, zeros 11, ff 5
+  [1] tag 0x2007 id 0x2007 JpgFromRaw             struct heap  len 0x1cdc00 off 0x662502
+      starts with JPEG SOI
+  [2] tag 0x300a id 0x300a ImageProps             heap2  heap  len 0x1642 off 0x830102
+  heap root/ImageProps: block @0x83011c len 0x1642, offsetTbl @+0x15ba, 13 records
+    [0] tag 0x5803 id 0x1803 ImageFormat            dword  inrec len 0x20001 off 0x41200000
+    [1] tag 0x1810 id 0x1810 ImageInfo              dword  heap  len 0x1c off 0xc
+        = u32 (3072, 2048, 1065353216, 0, 8, 24, 257)
+    [2] tag 0x500a id 0x100a TargetImageType        word   inrec len 0x6d8f0000 off 0xcfba0d73
+    [3] tag 0x5804 id 0x1804 RecordID               dword  inrec len 0x0 off 0xd8327aab
+    [4] tag 0x5817 id 0x1817 FileNumber             dword  inrec len 0xf42a3 off 0x9792ef1a
+    [5] tag 0x180e id 0x180e TimeStamp              dword  heap  len 0xc off 0x0
+        = u32 (1467566074, 0, 0)
+    [6] tag 0x0816 id 0x0816 OriginalFileName       ascii  heap  len 0x20 off 0x28
+        = b'CRW_0099.CRW'
+    [7] tag 0x0817 id 0x0817 ThumbnailFileName      ascii  heap  len 0x20 off 0x48
+        = b'CRW_0099.THM'
+    [8] tag 0x0805 id 0x0805 CanonFileDescription   ascii  heap  len 0x100 off 0x68
+    [9] tag 0x3003 id 0x3003 MeasuredInfo           heap2  heap  len 0x10 off 0x168
+    heap root/ImageProps/MeasuredInfo: block @0x830284 len 0x10, offsetTbl @+0x0, 1 records
+      [0] tag 0x5814 id 0x1814 MeasuredEV             dword  inrec len 0x3fc00000 off 0xe2577c1e
+    [10] tag 0x2804 id 0x2804 ImageDescription       heap1  heap  len 0x5a off 0x178
+    heap root/ImageProps/ImageDescription: block @0x830294 len 0x5a, offsetTbl @+0x40, 2 records
+      [0] tag 0x0805 id 0x0805 CanonFileDescription   ascii  heap  len 0x20 off 0x0
+          = b'EOS D60 CMOS RAW IMAGE'
+      [1] tag 0x0815 id 0x0815 CanonImageType         ascii  heap  len 0x20 off 0x20
+          = b'CRW:EOS D60 CMOS RAW IMAGE'
+    [11] tag 0x2807 id 0x2807 CameraObject           heap1  heap  len 0xb2 off 0x1d2
+    heap root/ImageProps/CameraObject: block @0x8302ee len 0xb2, offsetTbl @+0x8e, 3 records
+      [0] tag 0x0810 id 0x0810 OwnerName              ascii  heap  len 0x20 off 0x0
+          = b''
+      [1] tag 0x080a id 0x080a CanonRawMakeModel      ascii  heap  len 0x20 off 0x20
+          = b'Canon\x00Canon EOS D60\x00\x0e{\xd7\xd8e\x18iG\x03,,c'
+      [2] tag 0x3004 id 0x3004 CameraSpecification    heap2  heap  len 0x4e off 0x40
+      heap root/ImageProps/CameraObject/CameraSpecification: block @0x83032e len 0x4e, offsetTbl @+0x20, 4 records
+        [0] tag 0x580b id 0x180b SerialNumber           dword  inrec len 0x3645276f off 0x5982da24
+        [1] tag 0x501c id 0x101c BaseISO                word   inrec len 0x64 off 0xa552febb
+        [2] tag 0x480d id 0x080d ?                      ascii  inrec len 0x415355 off 0xfedcfe5
+        [3] tag 0x080b id 0x080b CanonFirmwareVersion   ascii  heap  len 0x20 off 0x0
+            = b'Firmware Version 1.0.4'
+    [12] tag 0x300b id 0x300b ExifInformation        heap2  heap  len 0x1336 off 0x284
+    heap root/ImageProps/ExifInformation: block @0x8303a0 len 0x1336, offsetTbl @+0x129a, 15 records
+      [0] tag 0x5028 id 0x1028 CanonFlashInfo         word   inrec len 0x64 off 0x0
+      [1] tag 0x5029 id 0x1029 CanonFocalLength       word   inrec len 0x0 off 0x2620392
+      [2] tag 0x102a id 0x102a CanonShotInfo          word   heap  len 0x36 off 0x0
+          = u16 (54, 0, 160, 52, 32768, 245, 65504, 0, 3, 0, 8, 8, 0, 0, 12288, 0, 0, 0, 1, 0, 0, 32768, 244, 99, 0, 0, 252)
+      [3] tag 0x102d id 0x102d CanonCameraSettings    word   heap  len 0x56 off 0x36
+      [4] tag 0x0036 id 0x0036 ?                      byte   heap  len 0xbd6 off 0x8c
+      [5] tag 0x5834 id 0x1834 CanonModelID           dword  inrec len 0x1668000 off 0xed8d4a16
+      [6] tag 0x1031 id 0x1031 SensorInfo             word   heap  len 0x22 off 0xc62
+          = u16 (34, 3152, 2068, 1, 1, 72, 16, 3143, 2063, 24, 224, 40, 1856, 0, 0, 0, 0)
+      [7] tag 0x1835 id 0x1835 DecoderTable           dword  heap  len 0x10 off 0xc84
+          = u32 (0, 0, 514, 5064559)
+      [8] tag 0x1033 id 0x1033 CustomFunctions        word   heap  len 0x22 off 0xc94
+          = u16 (32, 0, 515, 768, 1025, 1280, 1536, 1792, 2048, 2304, 2560, 2818, 3074, 3328, 3584, 3841, 18747)
+      [9] tag 0x10c0 id 0x10c0 ?                      word   heap  len 0x1a off 0xcb6
+          = u16 (26, 279, 368, 371, 172, 219, 434, 436, 284, 162, 491, 494, 431)
+      [10] tag 0x10c1 id 0x10c1 ?                      word   heap  len 0x1a off 0xcd0
+          = u16 (26, 281, 413, 415, 193, 223, 488, 490, 319, 150, 505, 507, 439)
+      [11] tag 0x10c2 id 0x10c2 ?                      word   heap  len 0x554 off 0xcea
+      [12] tag 0x10aa id 0x10aa ?                      word   heap  len 0xa off 0x123e
+          = u16 (10, 440, 1021, 1027, 563)
+      [13] tag 0x10a8 id 0x10a8 ?                      word   heap  len 0x10 off 0x1248
+          = u16 (16, 6000, 5312, 5989, 3161, 3717, 6503, 4118)
+      [14] tag 0x10a9 id 0x10a9 ColorBalance           word   heap  len 0x42 off 0x1258
+
+== corpus/crw/crw-canon-eos-digital-rebel.crw
+  size 10153786, byteOrder II, headerLength 26, type b'HEAP' subType b'CCDR', version 0x00010002
+heap root: block @0x1a len 0x9aef20, offsetTbl @+0x9aeefc, 3 records
+  [0] tag 0x2005 id 0x2005 RawData                struct heap  len 0x61c014 off 0x0
+      RawData: 6406164 bytes, entropy 7.8363 bits/byte
+        first 2 KiB: entropy -0.000, top bytes 00:2048, zeros 2048, ff 0
+        middle 2 KiB: entropy 7.825, top bytes 18:24, 59:18, cd:17, 06:17, zeros 10, ff 6
+        last 2 KiB: entropy 7.836, top bytes b5:19, 5a:17, 2c:17, 56:17, zeros 10, ff 2
+  [1] tag 0x2007 id 0x2007 JpgFromRaw             struct heap  len 0x3916ea off 0x61c014
+      starts with JPEG SOI
+  [2] tag 0x300a id 0x300a ImageProps             heap2  heap  len 0x17fe off 0x9ad6fe
+  heap root/ImageProps: block @0x9ad718 len 0x17fe, offsetTbl @+0x1776, 13 records
+    [0] tag 0x5803 id 0x1803 ImageFormat            dword  inrec len 0x20001 off 0x41200000
+    [1] tag 0x1810 id 0x1810 ImageInfo              dword  heap  len 0x1c off 0xc
+        = u32 (3072, 2048, 1065353216, 0, 8, 24, 257)
+    [2] tag 0x500a id 0x100a TargetImageType        word   inrec len 0xdfff0000 off 0x7ff757d7
+    [3] tag 0x5804 id 0x1804 RecordID               dword  inrec len 0x0 off 0x7d5d557f
+    [4] tag 0x5817 id 0x1817 FileNumber             dword  inrec len 0x221046 off 0x7df757dd
+    [5] tag 0x180e id 0x180e TimeStamp              dword  heap  len 0xc off 0x0
+        = u32 (1480372394, 0, 0)
+    [6] tag 0x0816 id 0x0816 OriginalFileName       ascii  heap  len 0x20 off 0x28
+        = b'CRW_2390.CRW'
+    [7] tag 0x0817 id 0x0817 ThumbnailFileName      ascii  heap  len 0x20 off 0x48
+        = b'CRW_2390.THM'
+    [8] tag 0x0805 id 0x0805 CanonFileDescription   ascii  heap  len 0x100 off 0x68
+    [9] tag 0x3003 id 0x3003 MeasuredInfo           heap2  heap  len 0x10 off 0x168
+    heap root/ImageProps/MeasuredInfo: block @0x9ad880 len 0x10, offsetTbl @+0x0, 1 records
+      [0] tag 0x5814 id 0x1814 MeasuredEV             dword  inrec len 0xbec00000 off 0xd7dd55f5
+    [10] tag 0x2804 id 0x2804 ImageDescription       heap1  heap  len 0x5a off 0x178
+    heap root/ImageProps/ImageDescription: block @0x9ad890 len 0x5a, offsetTbl @+0x40, 2 records
+      [0] tag 0x0805 id 0x0805 CanonFileDescription   ascii  heap  len 0x20 off 0x0
+          = b'EOS DIGITAL REBEL CMOS RAW'
+      [1] tag 0x0815 id 0x0815 CanonImageType         ascii  heap  len 0x20 off 0x20
+          = b'CRW:EOS DIGITAL REBEL CMOS RAW'
+    [11] tag 0x2807 id 0x2807 CameraObject           heap1  heap  len 0xb2 off 0x1d2
+    heap root/ImageProps/CameraObject: block @0x9ad8ea len 0xb2, offsetTbl @+0x8e, 3 records
+      [0] tag 0x0810 id 0x0810 OwnerName              ascii  heap  len 0x20 off 0x0
+          = b''
+      [1] tag 0x080a id 0x080a CanonRawMakeModel      ascii  heap  len 0x20 off 0x20
+          = b'Canon\x00Canon EOS DIGITAL REBEL\x00w\x7f'
+      [2] tag 0x3004 id 0x3004 CameraSpecification    heap2  heap  len 0x4e off 0x40
+      heap root/ImageProps/CameraObject/CameraSpecification: block @0x9ad92a len 0x4e, offsetTbl @+0x20, 4 records
+        [0] tag 0x580b id 0x180b SerialNumber           dword  inrec len 0x5116c2ff off 0xf55d5ff7
+        [1] tag 0x501c id 0x101c BaseISO                word   inrec len 0x64 off 0x5ff555f5
+        [2] tag 0x480d id 0x080d ?                      ascii  inrec len 0x415355 off 0x5ddd77ff
+        [3] tag 0x080b id 0x080b CanonFirmwareVersion   ascii  heap  len 0x20 off 0x0
+            = b'Firmware Version 1.1.1'
+    [12] tag 0x300b id 0x300b ExifInformation        heap2  heap  len 0x14f2 off 0x284
+    heap root/ImageProps/ExifInformation: block @0x9ad99c len 0x14f2, offsetTbl @+0x1406, 23 records
+      [0] tag 0x5028 id 0x1028 CanonFlashInfo         word   inrec len 0x64 off 0x0
+      [1] tag 0x5029 id 0x1029 CanonFocalLength       word   inrec len 0x320000 off 0x2620392
+      [2] tag 0x102a id 0x102a CanonShotInfo          word   heap  len 0x42 off 0x0
+      [3] tag 0x1093 id 0x1093 ?                      word   heap  len 0x12 off 0x42
+          = u16 (18, 0, 0, 0, 0, 0, 65535, 65535, 65535)
+      [4] tag 0x102d id 0x102d CanonCameraSettings    word   heap  len 0x5c off 0x54
+      [5] tag 0x0036 id 0x0036 ?                      byte   heap  len 0xe82 off 0xb0
+      [6] tag 0x5834 id 0x1834 CanonModelID           dword  inrec len 0x80000170 off 0xdf777555
+      [7] tag 0x1031 id 0x1031 SensorInfo             word   heap  len 0x22 off 0xf32
+          = u16 (34, 3152, 2068, 1, 1, 72, 16, 3143, 2063, 24, 224, 40, 1856, 0, 0, 0, 0)
+      [8] tag 0x1835 id 0x1835 DecoderTable           dword  heap  len 0x10 off 0xf54
+          = u32 (0, 0, 514, 4776577)
+      [9] tag 0x1038 id 0x1038 CanonAFInfo            word   heap  len 0x30 off 0xf64
+          = u16 (7, 7, 3072, 2048, 3072, 2048, 151, 151, 1014, 608, 0, 0, 0, 64928, 64522, 0, 0, 65030, 0, 506, 0, 0, 8, 65535)
+      [10] tag 0x10c0 id 0x10c0 ?                      word   heap  len 0x1a off 0xf94
+          = u16 (26, 327, 378, 369, 173, 258, 466, 457, 290, 186, 508, 497, 420)
+      [11] tag 0x10c1 id 0x10c1 ?                      word   heap  len 0x1a off 0xfae
+          = u16 (26, 304, 375, 375, 168, 206, 394, 395, 235, 158, 453, 454, 363)
+      [12] tag 0x10c2 id 0x10c2 ?                      word   heap  len 0x374 off 0xfc8
+      [13] tag 0x10aa id 0x10aa ?                      word   heap  len 0xa off 0x133c
+          = u16 (10, 743, 1022, 1026, 483)
+      [14] tag 0x10a8 id 0x10a8 ?                      word   heap  len 0x14 off 0x1346
+          = u16 (20, 2993, 5200, 6982, 5987, 3210, 3894, 6220, 2675, 5190)
+      [15] tag 0x10ad id 0x10ad ?                      word   heap  len 0x3e off 0x135a
+          = u16 (62, 20127, 8480, 7000, 6000, 5600, 5200, 4724, 4200, 3266, 1446, 64839, 65135, 65196, 65255, 65286, 65324, 65373, 65444, 110, 671, 65391, 65193, 65166, 65140, 65124, 65110, 65099, 65088, 65070, 65282)
+      [16] tag 0x10ae id 0x10ae ColorTemperature       word   heap  len 0x2 off 0x13ea
+          = u16 (5200,)
+      [17] tag 0x10af id 0x10af ?                      word   heap  len 0x2 off 0x13ec
+          = u16 (1268,)
+      [18] tag 0x10a9 id 0x10a9 ColorBalance           word   heap  len 0x52 off 0x1398
+      [19] tag 0x10b4 id 0x10b4 ColorSpace             word   heap  len 0x2 off 0x13ee
+          = u16 (1,)
+      [20] tag 0x10b5 id 0x10b5 RawJpgInfo             word   heap  len 0xa off 0x13f0
+          = u16 (10, 3, 0, 3072, 2048)
+      [21] tag 0x1039 id 0x1039 ?                      word   heap  len 0x8 off 0x13fa
+          = u16 (0, 159, 7, 112)
+      [22] tag 0x183b id 0x183b SerialNumberFormat     dword  heap  len 0x4 off 0x1402
+          = u32 (2415919104,)
+
+== corpus/crw/crw-canon-powershot-g1.crw
+  size 2300702, byteOrder II, headerLength 26, type b'HEAP' subType b'CCDR', version 0x00010002
+heap root: block @0x1a len 0x231b04, offsetTbl @+0x231ae0, 3 records
+  [0] tag 0x2005 id 0x2005 RawData                struct heap  len 0x2271ca off 0x0
+      RawData: 2257354 bytes, entropy 7.9338 bits/byte
+        first 2 KiB: entropy 6.516, top bytes 00:522, 22:26, 24:21, 64:18, zeros 522, ff 4
+        middle 2 KiB: entropy 7.827, top bytes 5a:23, 6d:23, 99:17, aa:17, zeros 8, ff 1
+        last 2 KiB: entropy 7.669, top bytes 44:31, 4c:30, 88:26, 20:24, zeros 16, ff 9
+  [1] tag 0x2007 id 0x2007 JpgFromRaw             struct heap  len 0x9394 off 0x2271ca
+      starts with JPEG SOI
+  [2] tag 0x300a id 0x300a ImageProps             heap2  heap  len 0x1582 off 0x23055e
+  heap root/ImageProps: block @0x230578 len 0x1582, offsetTbl @+0x14fa, 13 records
+    [0] tag 0x5803 id 0x1803 ImageFormat            dword  inrec len 0x20001 off 0x41200000
+    [1] tag 0x1810 id 0x1810 ImageInfo              dword  heap  len 0x1c off 0x0
+        = u32 (2048, 1536, 1065353216, 0, 8, 24, 257)
+    [2] tag 0x500a id 0x100a TargetImageType        word   inrec len 0xc5600000 off 0xbee19e93
+    [3] tag 0x5804 id 0x1804 RecordID               dword  inrec len 0x0 off 0x51bd76d5
+    [4] tag 0x5817 id 0x1817 FileNumber             dword  inrec len 0x11b9dd off 0x0
+    [5] tag 0x180e id 0x180e TimeStamp              dword  heap  len 0xc off 0x1c
+        = u32 (1065594172, 0, 0)
+    [6] tag 0x0816 id 0x0816 OriginalFileName       ascii  heap  len 0x20 off 0x28
+        = b'CRW_1693.CRW\x00\x8e&\xe1>4\xd2\xd2\xa1ko\xddv?\xa5\x0f\xa8C\x0eY'
+    [7] tag 0x0817 id 0x0817 ThumbnailFileName      ascii  heap  len 0x20 off 0x48
+        = b'CRW_1693.THM\x00~,\x07\xef\x19\xef\x88\xe3\xef2t\x89\n\x82\x88\x84\xe97\xe8'
+    [8] tag 0x0805 id 0x0805 CanonFileDescription   ascii  heap  len 0x100 off 0x68
+    [9] tag 0x3003 id 0x3003 MeasuredInfo           heap2  heap  len 0x10 off 0x168
+    heap root/ImageProps/MeasuredInfo: block @0x2306e0 len 0x10, offsetTbl @+0x0, 1 records
+      [0] tag 0x5814 id 0x1814 MeasuredEV             dword  inrec len 0x0 off 0xab71c23a
+    [10] tag 0x2804 id 0x2804 ImageDescription       heap1  heap  len 0x58 off 0x178
+    heap root/ImageProps/ImageDescription: block @0x2306f0 len 0x58, offsetTbl @+0x3e, 2 records
+      [0] tag 0x0805 id 0x0805 CanonFileDescription   ascii  heap  len 0x20 off 0x0
+          = b'High definition CCD image\x00\xfd\xa31\x18u\x0b'
+      [1] tag 0x0815 id 0x0815 CanonImageType         ascii  heap  len 0x1e off 0x20
+          = b'CRW:High definition CCD image'
+    [11] tag 0x2807 id 0x2807 CameraObject           heap1  heap  len 0x8e off 0x1d0
+    heap root/ImageProps/CameraObject: block @0x230748 len 0x8e, offsetTbl @+0x6a, 3 records
+      [0] tag 0x0810 id 0x0810 OwnerName              ascii  heap  len 0xc off 0x0
+          = b'Kelly Sauke'
+      [1] tag 0x080a id 0x080a CanonRawMakeModel      ascii  heap  len 0x19 off 0xc
+          = b'Canon\x00Canon PowerShot G1'
+      [2] tag 0x3004 id 0x3004 CameraSpecification    heap2  heap  len 0x44 off 0x26
+      heap root/ImageProps/CameraObject/CameraSpecification: block @0x23076e len 0x44, offsetTbl @+0x16, 4 records
+        [0] tag 0x580b id 0x180b SerialNumber           dword  inrec len 0x0 off 0x6eb7053
+        [1] tag 0x501c id 0x101c BaseISO                word   inrec len 0x64 off 0xf13edcd9
+        [2] tag 0x480d id 0x080d ?                      ascii  inrec len 0x415355 off 0xa9d94930
+        [3] tag 0x080b id 0x080b CanonFirmwareVersion   ascii  heap  len 0x16 off 0x0
+            = b'Firmware Version 1.02'
+    [12] tag 0x300b id 0x300b ExifInformation        heap2  heap  len 0x129c off 0x25e
+    heap root/ImageProps/ExifInformation: block @0x2307d6 len 0x129c, offsetTbl @+0x121e, 12 records
+      [0] tag 0x0001 id 0x0001 FreeBytes              byte   heap  len 0xc off 0x0
+      [1] tag 0x5028 id 0x1028 CanonFlashInfo         word   inrec len 0x0 off 0x0
+      [2] tag 0x5029 id 0x1029 CanonFocalLength       word   inrec len 0x1d30002 off 0xbd00fc
+      [3] tag 0x102a id 0x102a CanonShotInfo          word   heap  len 0x34 off 0xc
+          = u16 (52, 0, 128, 115, 73, 170, 0, 0, 0, 0, 24, 0, 0, 0, 0, 0, 0, 0, 1, 494, 0, 79, 164, 0, 0, 0)
+      [4] tag 0x102d id 0x102d CanonCameraSettings    word   heap  len 0x46 off 0x40
+      [5] tag 0x102c id 0x102c CanonColorInfo2        word   heap  len 0x100 off 0x86
+      [6] tag 0x0032 id 0x0032 ?                      byte   heap  len 0x800 off 0x186
+      [7] tag 0x0036 id 0x0036 ?                      byte   heap  len 0x800 off 0x986
+      [8] tag 0x1030 id 0x1030 WhiteSample            word   heap  len 0x66 off 0x1186
+      [9] tag 0x5834 id 0x1834 CanonModelID           dword  inrec len 0x4040000 off 0x2255b19d
+      [10] tag 0x1031 id 0x1031 SensorInfo             word   heap  len 0x22 off 0x11ec
+          = u16 (34, 2144, 1560, 1, 1, 24, 15, 2071, 1550, 2108, 15, 2111, 1550, 0, 0, 0, 0)
+      [11] tag 0x1835 id 0x1835 DecoderTable           dword  heap  len 0x10 off 0x120e
+          = u32 (1, 0, 514, 2257351)
+
+== corpus/crw/crw-canon-powershot-g5.crw
+  size 4894440, byteOrder II, headerLength 26, type b'HEAP' subType b'CCDR', version 0x00010002
+heap root: block @0x1a len 0x4aaece, offsetTbl @+0x4aaea0, 4 records
+  [0] tag 0x2005 id 0x2005 RawData                struct heap  len 0x4a2f6e off 0x0
+      RawData: 4861806 bytes, entropy 7.9622 bits/byte
+        first 2 KiB: entropy 6.656, top bytes 00:529, bb:14, b8:13, 73:13, zeros 529, ff 4
+        middle 2 KiB: entropy 7.819, top bytes b2:24, 55:22, 75:21, 57:21, zeros 8, ff 1
+        last 2 KiB: entropy 7.680, top bytes 89:34, 44:34, 4c:28, 88:28, zeros 20, ff 6
+  [1] tag 0x2007 id 0x2007 JpgFromRaw             struct heap  len 0x530e off 0x4a2f6e
+      starts with JPEG SOI
+  [2] tag 0x2008 id 0x2008 ThumbnailImage         struct heap  len 0x9fe off 0x4a827c
+      starts with JPEG SOI
+  [3] tag 0x300a id 0x300a ImageProps             heap2  heap  len 0x2226 off 0x4a8c7a
+  heap root/ImageProps: block @0x4a8c94 len 0x2226, offsetTbl @+0x219e, 13 records
+    [0] tag 0x5803 id 0x1803 ImageFormat            dword  inrec len 0x20001 off 0x41200000
+    [1] tag 0x1810 id 0x1810 ImageInfo              dword  heap  len 0x1c off 0xc
+        = u32 (2592, 1944, 1065353216, 0, 8, 24, 257)
+    [2] tag 0x500a id 0x100a TargetImageType        word   inrec len 0xc9e90000 off 0x1fba0082
+    [3] tag 0x5804 id 0x1804 RecordID               dword  inrec len 0x0 off 0xfc48c47b
+    [4] tag 0x5817 id 0x1817 FileNumber             dword  inrec len 0x10078a off 0xa0fcb31
+    [5] tag 0x180e id 0x180e TimeStamp              dword  heap  len 0xc off 0x0
+        = u32 (1059363106, 0, 0)
+    [6] tag 0x0816 id 0x0816 OriginalFileName       ascii  heap  len 0x20 off 0x28
+        = b'CRW_0506.CRW\x001Y)\x97\xab\xf9n8\xba)\xd7\x9d\xd9\xc2\x13\x8a 9\x01'
+    [7] tag 0x0817 id 0x0817 ThumbnailFileName      ascii  heap  len 0x20 off 0x48
+        = b'CRW_0506.THM\x00\x05\xc3!\xe5\xbc\xb1<\xf83\xde\xe1E\x93\xb1e5\xab\x81\x92'
+    [8] tag 0x0805 id 0x0805 CanonFileDescription   ascii  heap  len 0x100 off 0x68
+    [9] tag 0x3003 id 0x3003 MeasuredInfo           heap2  heap  len 0x10 off 0x168
+    heap root/ImageProps/MeasuredInfo: block @0x4a8dfc len 0x10, offsetTbl @+0x0, 1 records
+      [0] tag 0x5814 id 0x1814 MeasuredEV             dword  inrec len 0x0 off 0xff9410
+    [10] tag 0x2804 id 0x2804 ImageDescription       heap1  heap  len 0x5a off 0x178
+    heap root/ImageProps/ImageDescription: block @0x4a8e0c len 0x5a, offsetTbl @+0x40, 2 records
+      [0] tag 0x0805 id 0x0805 CanonFileDescription   ascii  heap  len 0x20 off 0x0
+          = b'High definition CCD image\x00\xad\xc1<\xb1\x80\xc0'
+      [1] tag 0x0815 id 0x0815 CanonImageType         ascii  heap  len 0x20 off 0x20
+          = b'CRW:High definition CCD image\x00LF'
+    [11] tag 0x2807 id 0x2807 CameraObject           heap1  heap  len 0xa8 off 0x1d2
+    heap root/ImageProps/CameraObject: block @0x4a8e66 len 0xa8, offsetTbl @+0x84, 3 records
+      [0] tag 0x0810 id 0x0810 OwnerName              ascii  heap  len 0x20 off 0x0
+          = b'\x008\x9e!,v\xf7\xc7\x18\xc4c"K\xfe\xe8;\xf4=\x9f\x1e\'9\xe3\x19nq%\xa1\x92\xb3\x853'
+      [1] tag 0x080a id 0x080a CanonRawMakeModel      ascii  heap  len 0x20 off 0x20
+          = b'Canon\x00Canon PowerShot G5\x009\x1c\xed\x8f6\xac\xa2'
+      [2] tag 0x3004 id 0x3004 CameraSpecification    heap2  heap  len 0x44 off 0x40
+      heap root/ImageProps/CameraObject/CameraSpecification: block @0x4a8ea6 len 0x44, offsetTbl @+0x20, 3 records
+        [0] tag 0x501c id 0x101c BaseISO                word   inrec len 0x64 off 0xad6e2c6d
+        [1] tag 0x480d id 0x080d ?                      ascii  inrec len 0x415355 off 0x5cc19942
+        [2] tag 0x080b id 0x080b CanonFirmwareVersion   ascii  heap  len 0x20 off 0x0
+            = b'Firmware Version 1.00\x00\x00\x98\xaa\xebP\xf9rhu\xd0'
+    [12] tag 0x300b id 0x300b ExifInformation        heap2  heap  len 0x1f24 off 0x27a
+    heap root/ImageProps/ExifInformation: block @0x4a8f0e len 0x1f24, offsetTbl @+0x1e7e, 16 records
+      [0] tag 0x0001 id 0x0001 FreeBytes              byte   heap  len 0xc off 0x0
+      [1] tag 0x5028 id 0x1028 CanonFlashInfo         word   inrec len 0x400 off 0x0
+      [2] tag 0x5029 id 0x1029 CanonFocalLength       word   inrec len 0xe60002 off 0xd7011e
+      [3] tag 0x102a id 0x102a CanonShotInfo          word   heap  len 0x44 off 0xc
+      [4] tag 0x102d id 0x102d CanonCameraSettings    word   heap  len 0x5c off 0x50
+      [5] tag 0x0032 id 0x0032 ?                      byte   heap  len 0x800 off 0xac
+      [6] tag 0x0036 id 0x0036 ?                      byte   heap  len 0x1400 off 0x8ac
+      [7] tag 0x1030 id 0x1030 WhiteSample            word   heap  len 0x76 off 0x1cac
+      [8] tag 0x5834 id 0x1834 CanonModelID           dword  inrec len 0x1290000 off 0x725bca88
+      [9] tag 0x1031 id 0x1031 SensorInfo             word   heap  len 0x22 off 0x1d22
+          = u16 (34, 2672, 1968, 1, 1, 24, 14, 2615, 1957, 2640, 14, 2643, 1957, 0, 0, 0, 0)
+      [10] tag 0x1835 id 0x1835 DecoderTable           dword  heap  len 0x10 off 0x1d44
+          = u32 (1, 0, 514, 4861804)
+      [11] tag 0x1038 id 0x1038 CanonAFInfo            word   heap  len 0x38 off 0x1d54
+          = u16 (9, 1, 2592, 1944, 2592, 215, 467, 39, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0)
+      [12] tag 0x1039 id 0x1039 ?                      word   heap  len 0x8 off 0x1d8c
+          = u16 (0, 0, 0, 0)
+      [13] tag 0x10b5 id 0x10b5 RawJpgInfo             word   heap  len 0xa off 0x1d94
+          = u16 (10, 2, 2, 640, 480)
+      [14] tag 0x103c id 0x103c ?                      word   heap  len 0x9c off 0x1d9e
+      [15] tag 0x107f id 0x107f ?                      word   heap  len 0x44 off 0x1e3a
+
+== corpus/crw/crw-canon-powershot-g6.crw
+  size 8052032, byteOrder II, headerLength 26, type b'HEAP' subType b'CCDR', version 0x00010002
+heap root: block @0x1a len 0x7add26, offsetTbl @+0x7adcf8, 4 records
+  [0] tag 0x2005 id 0x2005 RawData                struct heap  len 0x6f9704 off 0x0
+      RawData: 7313156 bytes, entropy 7.9774 bits/byte
+        first 2 KiB: entropy 6.684, top bytes 00:520, c1:14, 48:14, ae:13, zeros 520, ff 8
+        middle 2 KiB: entropy 7.885, top bytes 12:18, 31:17, 93:16, 64:15, zeros 13, ff 5
+        last 2 KiB: entropy 7.355, top bytes f7:42, 63:36, ef:35, 7e:35, zeros 14, ff 15
+  [1] tag 0x2007 id 0x2007 JpgFromRaw             struct heap  len 0xae5f4 off 0x6f9704
+      starts with JPEG SOI
+  [2] tag 0x2008 id 0x2008 ThumbnailImage         struct heap  len 0x17b8 off 0x7a7cf8
+      starts with JPEG SOI
+  [3] tag 0x300a id 0x300a ImageProps             heap2  heap  len 0x4848 off 0x7a94b0
+  heap root/ImageProps: block @0x7a94ca len 0x4848, offsetTbl @+0x47c0, 13 records
+    [0] tag 0x5803 id 0x1803 ImageFormat            dword  inrec len 0x20001 off 0x41200000
+    [1] tag 0x1810 id 0x1810 ImageInfo              dword  heap  len 0x1c off 0xc
+        = u32 (3072, 2304, 1065353216, 0, 8, 24, 257)
+    [2] tag 0x500a id 0x100a TargetImageType        word   inrec len 0xffff0000 off 0xffffffff
+    [3] tag 0x5804 id 0x1804 RecordID               dword  inrec len 0x0 off 0xffffffff
+    [4] tag 0x5817 id 0x1817 FileNumber             dword  inrec len 0x1257af off 0xffffffff
+    [5] tag 0x180e id 0x180e TimeStamp              dword  heap  len 0xc off 0x0
+        = u32 (1607955982, 0, 0)
+    [6] tag 0x0816 id 0x0816 OriginalFileName       ascii  heap  len 0x20 off 0x28
+        = b'CRW_2095.CRW\x00\n\\U\x88JJ\x04\x7f\xff'
+    [7] tag 0x0817 id 0x0817 ThumbnailFileName      ascii  heap  len 0x20 off 0x48
+        = b'CRW_2095.THM\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00 '
+    [8] tag 0x0805 id 0x0805 CanonFileDescription   ascii  heap  len 0x100 off 0x68
+    [9] tag 0x3003 id 0x3003 MeasuredInfo           heap2  heap  len 0x10 off 0x168
+    heap root/ImageProps/MeasuredInfo: block @0x7a9632 len 0x10, offsetTbl @+0x0, 1 records
+      [0] tag 0x5814 id 0x1814 MeasuredEV             dword  inrec len 0x0 off 0x0
+    [10] tag 0x2804 id 0x2804 ImageDescription       heap1  heap  len 0x5a off 0x178
+    heap root/ImageProps/ImageDescription: block @0x7a9642 len 0x5a, offsetTbl @+0x40, 2 records
+      [0] tag 0x0805 id 0x0805 CanonFileDescription   ascii  heap  len 0x20 off 0x0
+          = b'High definition CCD image'
+      [1] tag 0x0815 id 0x0815 CanonImageType         ascii  heap  len 0x20 off 0x20
+          = b'CRW:High definition CCD image'
+    [11] tag 0x2807 id 0x2807 CameraObject           heap1  heap  len 0xa8 off 0x1d2
+    heap root/ImageProps/CameraObject: block @0x7a969c len 0xa8, offsetTbl @+0x84, 3 records
+      [0] tag 0x0810 id 0x0810 OwnerName              ascii  heap  len 0x20 off 0x0
+          = b'\x00\x00\x00\x00\x00\x00\x80\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x08'
+      [1] tag 0x080a id 0x080a CanonRawMakeModel      ascii  heap  len 0x20 off 0x20
+          = b'Canon\x00Canon PowerShot G6'
+      [2] tag 0x3004 id 0x3004 CameraSpecification    heap2  heap  len 0x44 off 0x40
+      heap root/ImageProps/CameraObject/CameraSpecification: block @0x7a96dc len 0x44, offsetTbl @+0x20, 3 records
+        [0] tag 0x501c id 0x101c BaseISO                word   inrec len 0x64 off 0x0
+        [1] tag 0x480d id 0x080d ?                      ascii  inrec len 0x415355 off 0x0
+        [2] tag 0x080b id 0x080b CanonFirmwareVersion   ascii  heap  len 0x20 off 0x0
+            = b'Firmware Version 1.00'
+    [12] tag 0x300b id 0x300b ExifInformation        heap2  heap  len 0x4546 off 0x27a
+    heap root/ImageProps/ExifInformation: block @0x7a9744 len 0x4546, offsetTbl @+0x4482, 19 records
+      [0] tag 0x0001 id 0x0001 FreeBytes              byte   heap  len 0xc off 0x0
+      [1] tag 0x5028 id 0x1028 CanonFlashInfo         word   inrec len 0x0 off 0x0
+      [2] tag 0x5029 id 0x1029 CanonFocalLength       word   inrec len 0x2960002 off 0xd7011e
+      [3] tag 0x102a id 0x102a CanonShotInfo          word   heap  len 0x44 off 0xc
+      [4] tag 0x102d id 0x102d CanonCameraSettings    word   heap  len 0x5c off 0x50
+      [5] tag 0x0032 id 0x0032 ?                      byte   heap  len 0xc00 off 0xac
+      [6] tag 0x0041 id 0x0041 ?                      byte   heap  len 0x100 off 0xcac
+      [7] tag 0x0036 id 0x0036 ?                      byte   heap  len 0x2000 off 0xdac
+      [8] tag 0x1030 id 0x1030 WhiteSample            word   heap  len 0x76 off 0x42ac
+      [9] tag 0x5834 id 0x1834 CanonModelID           dword  inrec len 0x1400000 off 0xffffffff
+      [10] tag 0x1031 id 0x1031 SensorInfo             word   heap  len 0x22 off 0x4322
+          = u16 (34, 3160, 2344, 1, 1, 64, 24, 3135, 2327, 36, 24, 39, 2327, 0, 0, 0, 0)
+      [11] tag 0x1835 id 0x1835 DecoderTable           dword  heap  len 0x10 off 0x4344
+          = u32 (0, 0, 514, 7313154)
+      [12] tag 0x1038 id 0x1038 CanonAFInfo            word   heap  len 0x38 off 0x4354
+          = u16 (9, 1, 3072, 2304, 3072, 230, 553, 41, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0)
+      [13] tag 0x1039 id 0x1039 ?                      word   heap  len 0x8 off 0x438c
+          = u16 (0, 0, 0, 0)
+      [14] tag 0x10b5 id 0x10b5 RawJpgInfo             word   heap  len 0xa off 0x4394
+          = u16 (10, 2, 0, 3072, 2304)
+      [15] tag 0x0040 id 0x0040 ?                      byte   heap  len 0x100 off 0x2dac
+      [16] tag 0x003f id 0x003f ?                      byte   heap  len 0x1400 off 0x2eac
+      [17] tag 0x103c id 0x103c ?                      word   heap  len 0x9c off 0x439e
+      [18] tag 0x107f id 0x107f ?                      word   heap  len 0x48 off 0x443a
+

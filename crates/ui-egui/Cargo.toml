@@ -20,6 +20,7 @@ lightcraft-pipeline = { workspace = true }
 lightcraft-catalog = { workspace = true }
 web-time = { workspace = true }
 lightcraft-engine = { workspace = true }
+lightcraft-slideshow = { workspace = true }
 lightcraft-preview = { workspace = true }
 lightcraft-video = { workspace = true }
 egui = { workspace = true }
@@ -28,6 +29,8 @@ serde_json = { workspace = true }
 log = { workspace = true }
 
 [dev-dependencies]
+# tests record why they skip (`cargo xtask ci` lists the skips)
+lightcraft-testkit = { workspace = true }
 egui_kittest = { workspace = true, features = ["wgpu", "snapshot"] }
 # generated test clips (an H.264 encoder: tests only)
 lightcraft-video = { workspace = true, features = ["testkit"] }

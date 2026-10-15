@@ -30,6 +30,7 @@ miniz_oxide = { workspace = true }
 lightcraft-merge = { workspace = true }
 lightcraft-geocode = { workspace = true }
 lightcraft-video = { workspace = true }
+lightcraft-slideshow = { workspace = true }
 rayon = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -56,6 +57,8 @@ video-hevc = ["lightcraft-video/hevc"]
 [dev-dependencies]
 # generated test clips (an H.264 encoder: tests only)
 lightcraft-video = { workspace = true, features = ["testkit"] }
+# tests record why they skip (`cargo xtask ci` lists the skips)
+lightcraft-testkit = { workspace = true }
 # HDR JPEG XL tests read the file's colour encoding
 jxl-oxide = { workspace = true }
 # Lossless synthetic HEIC files (the import test; decoded when the codecs' `heif` feature is on).

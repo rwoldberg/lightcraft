@@ -4,11 +4,9 @@
 #   nix build          # → ./result/bin/lightcraft, ./result/bin/lightcraft-cli
 #
 # Kept in step with the release workflow (.github/workflows/release.yml) and packaging/env.sh:
-#   * `Cargo.lock` drives the dependencies (`cargoLock`), so there is no vendorHash to bump.
-#     NEEDS UPDATE (2026-10-11): the workspace now has git sources, the storytold/filmcraft crates
-#     behind `crates/video` (pinned by rev in the root Cargo.toml). `cargoLock` needs their hash in
-#     `cargoLock.outputHashes` (one entry per git crate name-version, all the same hash) before
-#     `nix build` works again; it is not guessed here. Bump it whenever that pin moves;
+#   * `Cargo.lock` drives the dependencies (`cargoLock`), so there is no vendorHash to bump. The git
+#     sources (storytold/craft-libs, and the storytold/filmcraft crates behind `crates/video`) are
+#     fetched at the revisions the lock file pins;
 #   * `CRAFT_FONTS_DIR` embeds the CJK fonts from storytold/craft-fonts (the `craft-fonts`
 #     flake input); without it everything builds and runs, but Japanese and Chinese text have no glyphs;
 #   * the desktop file, hicolor icons and AppStream metadata are the same files the .deb/.rpm ship
@@ -38,6 +36,9 @@
   libxi,
   libxrandr,
   vulkan-loader,
+  libglvnd,
+  # rfd opens libdbus-1 at run time to reach the xdg-desktop-portal file chooser (Open/Save dialogs).
+  dbus,
   # Validates the desktop file and the AppStream metadata we install (as CI does).
   desktop-file-utils,
   appstream,
@@ -62,8 +63,9 @@ let
   appId = "ai.storyteller.lightcraft";
 
   # Libraries the binaries open at run time with dlopen(): nothing links them, so no RPATH points at
-  # them — winit loads libxkbcommon/libxcb, wgpu the Vulkan loader (NixOS patches that loader to
-  # find the drivers in /run/opengl-driver). The wrapper below points LD_LIBRARY_PATH here.
+  # them — winit loads libwayland-client/libxkbcommon/libxcb, rfd libdbus-1, wgpu the Vulkan loader
+  # or libEGL (NixOS patches that loader to find the drivers in /run/opengl-driver). The wrapper
+  # below points LD_LIBRARY_PATH here.
   runtimeLibs = lib.optionals isLinux [
     libxkbcommon
     wayland
@@ -73,6 +75,8 @@ let
     libxi
     libxrandr
     vulkan-loader
+    libglvnd
+    dbus
   ];
 
   # The two native binaries. The wasm app (apps/lightcraft-web) is built by `cargo xtask web`, not
@@ -104,7 +108,11 @@ rustPlatform.buildRustPackage {
       ]);
   };
 
-  cargoLock.lockFile = root + "/Cargo.lock";
+  cargoLock = {
+    lockFile = root + "/Cargo.lock";
+    # The git dependencies (storytold/craft-libs, storytold/filmcraft) are pinned by revision in Cargo.lock.
+    allowBuiltinFetchGit = true;
+  };
 
   # Both binaries, as the .deb/.rpm install them (`packaging/linux/package.sh`).
   cargoBuildFlags = [

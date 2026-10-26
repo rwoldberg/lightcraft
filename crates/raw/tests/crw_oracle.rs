@@ -27,7 +27,7 @@ fn oracle_samples(bytes: &[u8]) -> (usize, usize, Vec<u16>) {
 #[test]
 fn crw_decodes_match_the_oracle() {
     let Some(dir) = std::env::var_os("LIGHTCRAFT_CRW_ORACLE").map(PathBuf::from) else {
-        eprintln!("LIGHTCRAFT_CRW_ORACLE not set; skipping");
+        lightcraft_testkit::skip!(Corpus, "LIGHTCRAFT_CRW_ORACLE not set");
         return;
     };
     let mut checked = 0;

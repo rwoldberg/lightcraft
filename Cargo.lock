@@ -1173,6 +1173,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "craft-crw"
+version = "0.1.0"
+dependencies = [
+ "thiserror 2.0.21",
+]
+
+[[package]]
 name = "craft-docpath"
 version = "0.1.0"
 source = "git+https://github.com/storytold/craft-libs?rev=1e6f127844ec61b3b8afdcc2bb76e7cfe470153f#1e6f127844ec61b3b8afdcc2bb76e7cfe470153f"
@@ -3652,6 +3659,8 @@ dependencies = [
 name = "lightcraft-raw"
 version = "0.14.0"
 dependencies = [
+ "chrono",
+ "craft-crw",
  "dhat",
  "jpeg-encoder",
  "jxl-oxide",

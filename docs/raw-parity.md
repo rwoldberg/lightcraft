@@ -120,9 +120,9 @@ unsupported to preview-only in the counts; sensor-decoding readiness is unchange
 | Leica | 1% | 99% | 72% | the Q3 verified, 13 more bodies pinned on CC0 files |
 | DJI | 1% | 96% | 19% | |
 | Medium format and others | 0.5% | 29% | 8% | IIQ, 3FR, X3F |
-| **Weighted** | 100% | **94%** | **85%** | |
+| **Weighted** | 100% | **94%** | **86%** | |
 
-About 19 in 20 raw photographers' cameras decode, and about 5 in 6 use a body we have actually
+About 19 in 20 raw photographers' cameras decode, and about 6 in 7 use a body we have actually
 checked (the per-model CC0 sweeps of October 2026); compressed ORF (OM / Olympus) is the largest gap left.
 
 ## Variant matrix (depth per format)
@@ -216,7 +216,7 @@ sample files. A pointer for contributors, not legal advice.
 
 | Item | Adobe | LightCraft |
 |---|---|---|
-| Default profile per model | Adobe Standard for every model (1,500 profile names in the bundle) | the DNG's own matrices; else a pooled profile (**5 bundled**: ILCA-99M2, ILCE-7CR, ILCE-7M4, X-H2S, X-T4); else a guarded per-file fit to the camera's embedded JPEG; else spectral matrices (**52 models**, rawtoaces-data, and the bodies sharing their sensors: 6 X-Trans CMOS 4 Fujifilm bodies take the X-T3's) or chart-measured ones (**1 model**, the EOS D60); else a neutral matrix |
+| Default profile per model | Adobe Standard for every model (1,500 profile names in the bundle) | the DNG's own matrices; else a pooled profile (**9 bundled**: EOS D60, ILCA-99M2, ILCE-7CR, ILCE-7M4, Nikon D5300, Nikon Z 6II, Nikon Z 8, X-H2S, X-T4); else a guarded per-file fit to the camera's embedded JPEG; else spectral matrices (**52 models**, rawtoaces-data, and the bodies sharing their sensors: 6 X-Trans CMOS 4 Fujifilm bodies take the X-T3's) or chart-measured ones (**1 model**, the EOS D60); else a neutral matrix |
 | Camera Matching looks | 481 models (plus phone-maker looks) | none (the per-file JPEG fit imitates the camera's own look) |
 | Creative profiles | Adobe Color, Portrait, Landscape, Vivid, Monochrome… | our own looks (Color, Neutral, Vivid, Landscape, Portrait, Monochrome) |
 | DCP / dual-illuminant model | ✅ | dual-illuminant DNG colour (ColorMatrix / ForwardMatrix 1-2, CameraCalibration, AnalogBalance), HueSatMap, LookTable, ProfileToneCurve; external `.dcp` never loaded (clean-room) |

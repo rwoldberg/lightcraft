@@ -16,12 +16,6 @@
 use crate::{BlackLevel, Cfa, ColorData, Metadata, Mode, OpcodeLists, Orientation, RawData, RawError, RawFormat, RawImage, Rect, Result};
 use lightcraft_meta::DateTime;
 
-fn limits() -> craft_crw::Limits {
-    let mut limits = craft_crw::Limits::default();
-    limits.max_samples = crate::MAX_SAMPLES;
-    limits
-}
-
 fn map_err(e: craft_crw::Error) -> RawError {
     match e {
         craft_crw::Error::NotCrw => RawError::NotRaw,
@@ -32,7 +26,10 @@ fn map_err(e: craft_crw::Error) -> RawError {
 }
 
 pub(crate) fn decode(bytes: &[u8], mode: Mode) -> Result<RawImage> {
-    let limits = limits();
+    // the crate's own cap (2²³ samples; the largest CRW frame is 7.4 million): its decode holds
+    // about three `u16` buffers of the declared size, so the raw crate's general `MAX_SAMPLES`
+    // (2³⁰) would let a malformed file ask for gigabytes
+    let limits = craft_crw::Limits::default();
     let full = mode == Mode::Full;
     let (h, samples, black, white) = if full {
         let img = craft_crw::decode(bytes, &limits).map_err(map_err)?;
@@ -108,6 +105,10 @@ mod tests {
     /// A CIFF file with the records the decoder reads and a pseudo-random payload: enough for the
     /// header path; the entropy data decodes or is refused, never panics.
     fn synthetic_crw(model: &str) -> Vec<u8> {
+        synthetic_crw_sized(model, W, H)
+    }
+
+    fn synthetic_crw_sized(model: &str, w: usize, h: usize) -> Vec<u8> {
         let le16 = |v: u16| v.to_le_bytes();
         let le32 = |v: u32| v.to_le_bytes();
         let heap = |records: &[(u16, Vec<u8>)]| -> Vec<u8> {
@@ -130,9 +131,9 @@ mod tests {
             b.extend_from_slice(&le32(tbl));
             b
         };
-        let sensor: Vec<u8> = [34u16, W as u16, H as u16, 0, 0, 2, 2, W as u16 - 3, H as u16 - 3].iter().flat_map(|&v| le16(v)).collect();
+        let sensor: Vec<u8> = [34u16, w as u16, h as u16, 0, 0, 2, 2, w as u16 - 3, h as u16 - 3].iter().flat_map(|&v| le16(v)).collect();
         let dtable: Vec<u8> = [0u32, 0, 514, 0].iter().flat_map(|&v| le32(v)).collect();
-        let image_info: Vec<u8> = [W as u32, H as u32, 0, 270, 12, 12, 0].iter().flat_map(|&v| le32(v)).collect();
+        let image_info: Vec<u8> = [w as u32, h as u32, 0, 270, 12, 12, 0].iter().flat_map(|&v| le32(v)).collect();
         let mut color_balance: Vec<u16> = vec![66];
         color_balance.extend([2000u16, 800, 800, 960]);
         color_balance.extend((0..7).flat_map(|_| [1500u16, 900, 900, 1500]));
@@ -190,6 +191,19 @@ mod tests {
         let Err(RawError::Unsupported(why)) = decode(&synthetic_crw("Canon PowerShot G5"), Mode::Header) else { panic!("expected Unsupported") };
         assert!(why.contains("PowerShot G5"), "{why}");
         assert_eq!(map_err(craft_crw::Error::LimitExceeded("image too large")), RawError::Limit("image too large"));
+    }
+
+    /// A file declaring more samples than any CRW camera has is refused before anything is
+    /// allocated: 4096 × 4096 (16.8 million) passed when the adapter raised the crate's cap of 2²³
+    /// to the raw crate's 2³⁰.
+    #[test]
+    fn an_oversized_crw_is_refused_by_the_crates_own_limit() {
+        let f = synthetic_crw_sized("Canon EOS D60", 4096, 4096);
+        for mode in [Mode::Header, Mode::Full] {
+            assert_eq!(decode(&f, mode).err(), Some(RawError::Limit("image too large")), "{mode:?}");
+        }
+        // the largest real frame (the 10D's 3152 × 2068) is within it
+        assert!(decode(&synthetic_crw_sized("Canon EOS D60", 3152, 2068), Mode::Header).is_ok());
     }
 
     #[test]

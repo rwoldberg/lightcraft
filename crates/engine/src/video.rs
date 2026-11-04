@@ -28,6 +28,13 @@ pub fn is_video_photo(photo: &lightcraft_catalog::Photo) -> bool {
     photo.kind == MediaKind::Video || matches!(&photo.source, lightcraft_catalog::Source::File { path } if is_video(path))
 }
 
+/// Can this build show the entry's poster: a video file in a container [`EXTENSIONS`] names?
+/// Other videos (an AVI, an MKV, … from a Lightroom catalog) go to no decoder (issue #2682); nor
+/// does any video in the browser build, which can't open them yet.
+pub fn has_poster(photo: &lightcraft_catalog::Photo) -> bool {
+    cfg!(not(target_arch = "wasm32")) && matches!(&photo.source, lightcraft_catalog::Source::File { path } if is_video(path))
+}
+
 /// Bytes hashed at each end of a video for [`ProbeInfo::content_hash`].
 const HASH_SPAN: u64 = 1 << 20;
 

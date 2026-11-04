@@ -603,8 +603,8 @@ pub fn show_loupe(app: &mut LightcraftApp, ui: &mut egui::Ui, canvas: Rect, phot
         None => (false, 0.0, photo.duration.unwrap_or(0.0), None),
     };
     // a click on the picture plays / pauses; a large play mark says it can be played
-    let picture = ui.interact(img, egui::Id::new(("video-loupe", id.0)), Sense::click());
-    register(ui.ctx(), "video:picture", img);
+    let picture = ui.interact(img, egui::Id::unique(("video-loupe", id.0)), Sense::click());
+    register(ui, "video:picture", img);
     let mut act: Option<(&str, Value)> = None;
     if picture.clicked() {
         act = Some(("video.playPause", json!({})));
@@ -621,15 +621,15 @@ pub fn show_loupe(app: &mut LightcraftApp, ui: &mut egui::Ui, canvas: Rect, phot
         let r = Rect::from_center_size(img.center(), g.size() + vec2(24.0, 16.0));
         p.rect_filled(r, 6.0, Color32::from_black_alpha(200));
         p.galley(r.min + vec2(12.0, 8.0), g, Color32::WHITE);
-        register(ui.ctx(), "video:error", r);
+        register(ui, "video:error", r);
     }
 
     // the transport bar: play / pause, the time, the scrubber, the length
     p.rect_filled(bar, 0.0, t.canvas);
     let mid = bar.center().y;
     let button = Rect::from_center_size(pos2(bar.left() + 30.0, mid), vec2(30.0, 30.0));
-    let b = ui.interact(button, egui::Id::new("video-play"), Sense::click()).on_hover_text(crate::i18n::tr("Play / Pause (Space)"));
-    register(ui.ctx(), "video:play", button);
+    let b = ui.interact(button, egui::Id::unique("video-play"), Sense::click()).on_hover_text(crate::i18n::tr("Play / Pause (Space)"));
+    register(ui, "video:play", button);
     if b.hovered() {
         p.rect_filled(button, 6.0, t.hover);
     }
@@ -639,17 +639,17 @@ pub fn show_loupe(app: &mut LightcraftApp, ui: &mut egui::Ui, canvas: Rect, phot
     }
     let time = p.text(pos2(button.right() + 12.0, mid), Align2::LEFT_CENTER, clock(position), t.font(12.0), t.text_label);
     let length = p.text(pos2(bar.right() - 20.0, mid), Align2::RIGHT_CENTER, clock(duration), t.font(12.0), t.text_dim);
-    register(ui.ctx(), "video:time", time);
+    register(ui, "video:time", time);
     // the volume: a loudspeaker that mutes, and a short slider
     let silent = app.video.as_ref().filter(|p| p.photo == id).and_then(Player::silent);
     let slider = Rect::from_min_max(pos2(length.left() - 14.0 - 56.0, mid - 10.0), pos2(length.left() - 14.0, mid + 10.0));
     let speaker = Rect::from_center_size(pos2(slider.left() - 20.0, mid), vec2(28.0, 28.0));
-    let m = ui.interact(speaker, egui::Id::new("video-mute"), Sense::click());
+    let m = ui.interact(speaker, egui::Id::unique("video-mute"), Sense::click());
     let m = match &silent {
         Some(why) => m.on_hover_text(format!("{}: {why}", crate::i18n::tr("No sound"))),
         None => m.on_hover_text(crate::i18n::tr(if muted { "Unmute" } else { "Mute" })),
     };
-    register(ui.ctx(), "video:mute", speaker);
+    register(ui, "video:mute", speaker);
     if m.hovered() {
         p.rect_filled(speaker, 6.0, t.hover);
     }
@@ -657,8 +657,8 @@ pub fn show_loupe(app: &mut LightcraftApp, ui: &mut egui::Ui, canvas: Rect, phot
     if m.clicked() {
         act = Some(("video.mute", json!({})));
     }
-    let v = ui.interact(slider, egui::Id::new("video-volume"), Sense::click_and_drag()).on_hover_text(crate::i18n::tr("Volume"));
-    register(ui.ctx(), "video:volume", slider);
+    let v = ui.interact(slider, egui::Id::unique("video-volume"), Sense::click_and_drag()).on_hover_text(crate::i18n::tr("Volume"));
+    register(ui, "video:volume", slider);
     let shown = if muted { 0.0 } else { volume.clamp(0.0, 1.0) };
     let groove = Rect::from_min_max(pos2(slider.left(), mid - 1.5), pos2(slider.right(), mid + 1.5));
     p.rect_filled(groove, 1.5, t.hover);
@@ -671,8 +671,8 @@ pub fn show_loupe(app: &mut LightcraftApp, ui: &mut egui::Ui, canvas: Rect, phot
         act = Some(("video.volume", json!({"level": ((pointer.x - slider.left()) / slider.width()).clamp(0.0, 1.0)})));
     }
     let track = Rect::from_min_max(pos2(time.right() + 14.0, mid - 10.0), pos2((speaker.left() - 12.0).max(time.right() + 15.0), mid + 10.0));
-    let s = ui.interact(track, egui::Id::new("video-seek"), Sense::click_and_drag());
-    register(ui.ctx(), "video:seek", track);
+    let s = ui.interact(track, egui::Id::unique("video-seek"), Sense::click_and_drag());
+    register(ui, "video:seek", track);
     let fraction = if duration > 0.0 { (position / duration).clamp(0.0, 1.0) as f32 } else { 0.0 };
     let line = Rect::from_min_max(pos2(track.left(), mid - 1.5), pos2(track.right(), mid + 1.5));
     p.rect_filled(line, 1.5, t.hover);

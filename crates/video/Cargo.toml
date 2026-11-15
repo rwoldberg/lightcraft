@@ -7,7 +7,7 @@ license.workspace = true
 
 [features]
 default = []
-# H.265 / HEVC clips (most iPhone video). Optional for the reason `lightcraft-heif` is: HEVC is
+# H.265 / HEVC clips (most iPhone video). Optional for the reason `craft-heif` is: HEVC is
 # patent-encumbered in some jurisdictions, so including a decoder is a distributor's choice.
 hevc = ["dep:filmcraft-hevc"]
 # Generated test clips (`lightcraft_video::testkit`): an H.264 and a JPEG encoder, for tests only.
